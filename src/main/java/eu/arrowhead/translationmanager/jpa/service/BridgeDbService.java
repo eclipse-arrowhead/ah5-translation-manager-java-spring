@@ -91,7 +91,7 @@ public class BridgeDbService {
 			}
 
 			final TranslationBridgeStatus toStatus = TranslationBridgeEventState.transformToBridgeStatus(dto.state());
-			if (!header.getStatus().isValidReportingState() || !TranslationBridgeStatus.isValidTransition(header.getStatus(), toStatus)) {
+			if (!header.getStatus().isActiveStatus() || !TranslationBridgeStatus.isValidTransition(header.getStatus(), toStatus)) {
 				// bridge should not reporting or the reported transition is invalid
 				throw new InvalidParameterException("Invalid reporting case");
 			}
@@ -213,7 +213,7 @@ public class BridgeDbService {
 		try {
 			final Optional<BridgeDetails> currentDetailsOpt = detailsRepository.findById(record.getId());
 			if (currentDetailsOpt.isPresent()) {
-				if (currentDetailsOpt.get().getHeader().getStatus().isEndState()) {
+				if (currentDetailsOpt.get().getHeader().getStatus().isEndStatus()) {
 					return true;
 				}
 
@@ -238,7 +238,7 @@ public class BridgeDbService {
 			if (TranslationBridgeStatus.PENDING == header.getStatus()) {
 				header.setStatus(TranslationBridgeStatus.INITIALIZED);
 				headerRepository.saveAndFlush(header);
-			} else if (header.getStatus().isEndState()) {
+			} else if (header.getStatus().isEndStatus()) {
 				return true;
 			}
 
@@ -276,6 +276,49 @@ public class BridgeDbService {
 		}
 	}
 
+	//-------------------------------------------------------------------------------------------------
+	@Transactional(rollbackFor = ArrowheadException.class)
+	public AbortResult abortBridge(final UUID bridgeId, final String createdByRequirement) {
+		logger.debug("abortBridge started...");
+		Assert.notNull(bridgeId, "bridgeId is missing");
+
+		try {
+			final Optional<BridgeHeader> headerOpt = headerRepository.findByUuid(bridgeId.toString());
+			if (headerOpt.isEmpty()) {
+				return new AbortResult(false, null, null);
+			}
+
+			BridgeHeader header = headerOpt.get();
+			if (!Utilities.isEmpty(createdByRequirement)
+					&& !createdByRequirement.equals(header.getCreatedBy())) {
+				// no permission to abort this bridge
+				throw new ForbiddenException("No permission to abort bridge: " + bridgeId.toString());
+			}
+
+			final TranslationBridgeStatus oldStatus = header.getStatus();
+			if (TranslationBridgeStatus.isValidTransition(header.getStatus(), TranslationBridgeStatus.ABORTED)) {
+				// delete related discovery records (if any)
+				discoveryRepository.deleteByHeader(header);
+
+				header.setStatus(TranslationBridgeStatus.ABORTED);
+				header = headerRepository.saveAndFlush(header);
+
+				final Optional<BridgeDetails> detailsOpt = detailsRepository.findByHeader(header);
+
+				return new AbortResult(true, oldStatus, detailsOpt.isEmpty() ? null : detailsOpt.get());
+			}
+
+			// already aborted, closed or in error state
+			return new AbortResult(false, oldStatus, null);
+		} catch (final ForbiddenException ex) {
+			throw ex;
+		} catch (final Exception ex) {
+			logger.error(ex.getMessage());
+			logger.debug(ex);
+			throw new InternalServerError("Database operation error");
+		}
+	}
+
 	//=================================================================================================
 	// assistant methods
 
@@ -292,4 +335,15 @@ public class BridgeDbService {
 
 		return Optional.empty();
 	}
+
+	//=================================================================================================
+	// nested structures
+
+	//-------------------------------------------------------------------------------------------------
+	public record AbortResult(
+			boolean abortHappened,
+			TranslationBridgeStatus fromStatus,
+			BridgeDetails detailsRecord) {
+	}
+
 }

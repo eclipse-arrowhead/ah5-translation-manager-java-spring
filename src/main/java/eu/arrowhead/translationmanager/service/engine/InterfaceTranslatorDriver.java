@@ -18,6 +18,7 @@ package eu.arrowhead.translationmanager.service.engine;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
@@ -117,7 +118,7 @@ public class InterfaceTranslatorDriver {
 
 	//-------------------------------------------------------------------------------------------------
 	@SuppressWarnings("unchecked")
-	public Pair<ServiceInstanceInterfaceResponseDTO, ArrowheadException> initializeBridge(
+	public Pair<Optional<ServiceInstanceInterfaceResponseDTO>, Optional<ArrowheadException>> initializeBridge(
 			final UUID bridgeId,
 			final TranslationDiscoveryModel model,
 			final String token,
@@ -164,10 +165,10 @@ public class InterfaceTranslatorDriver {
 					ServiceInstanceInterfaceResponseDTO.class,
 					payload);
 
-			return Pair.of(response, null);
+			return Pair.of(Optional.of(response), Optional.empty());
 		} catch (final ArrowheadException ex) {
 			// some error happens during bridge initialization
-			return Pair.of(null, ex);
+			return Pair.of(Optional.empty(), Optional.of(ex));
 		}
 	}
 

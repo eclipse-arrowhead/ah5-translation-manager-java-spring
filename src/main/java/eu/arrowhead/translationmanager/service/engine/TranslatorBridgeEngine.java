@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
@@ -52,14 +53,14 @@ import eu.arrowhead.dto.TranslationDataModelTranslatorInitializationResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationInterfaceTranslationDataDescriptorDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
-import eu.arrowhead.translationmanager.TranslationManagerConstants;
+import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.jpa.service.BridgeDbService;
+import eu.arrowhead.translationmanager.jpa.service.BridgeDbService.AbortResult;
 import eu.arrowhead.translationmanager.service.dto.DTOConverter;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
-import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationNegotiationRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.TranslationDiscoveryModel;
 import eu.arrowhead.translationmanager.service.matchmaking.DataModelTranslatorMatchmaker;
 import eu.arrowhead.translationmanager.service.matchmaking.InterfaceTranslatorMatchmaker;
@@ -106,13 +107,13 @@ public class TranslatorBridgeEngine {
 	// methods
 
 	//-------------------------------------------------------------------------------------------------
-	public TranslationDiscoveryResponseDTO doDiscovery(final NormalizedTranslationDiscoveryRequestDTO dto, final Map<String, Boolean> discoveryFlags, final String origin) {
+	public TranslationDiscoveryResponseDTO doDiscovery(final NormalizedTranslationDiscoveryRequestDTO dto, final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags, final String origin) {
 		logger.debug("doDiscovery started...");
 		Assert.notNull(dto, "dto is null");
 		Assert.notNull(discoveryFlags, "discoveryFlags is null");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
-		if (discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_CONSUMER_BLACKLIST_CHECK, false)
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false)
 				&& csDriver.isBlacklisted(dto.consumer())) {
 			// consumer is on the blacklist
 			throw new ForbiddenException(dto.consumer() + " system is blacklisted");
@@ -177,14 +178,15 @@ public class TranslatorBridgeEngine {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public TranslationNegotiationResponseDTO doNegotiation(final NormalizedTranslationNegotiationRequestDTO dto, final String origin) {
+	public TranslationNegotiationResponseDTO doNegotiation(final UUID bridgeId, final String normalizedTargetInstanceId, final String origin) {
 		logger.debug("doNegotiation started...");
-		Assert.notNull(dto, "dto is null");
+		Assert.notNull(bridgeId, "bridgeId is null");
+		Assert.isTrue(!Utilities.isEmpty(normalizedTargetInstanceId), "normalizedTargetInstanceId is empty");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		boolean storeException = false;
 		try {
-			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(dto.bridgeId(), dto.target().instanceId());
+			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(bridgeId, normalizedTargetInstanceId);
 			storeException = true;
 			final TranslationDiscoveryModel model = bridgePair.getFirst();
 			final BridgeDetails detailsRecord = bridgePair.getSecond();
@@ -226,45 +228,45 @@ public class TranslatorBridgeEngine {
 						model.getOperation());
 			}
 
-			final Pair<ServiceInstanceInterfaceResponseDTO, ArrowheadException> bridgeResult = itDriver.initializeBridge(
-					dto.bridgeId(),
+			final Pair<Optional<ServiceInstanceInterfaceResponseDTO>, Optional<ArrowheadException>> bridgeResult = itDriver.initializeBridge(
+					bridgeId,
 					model,
 					token,
 					interfaceTranslatorSettings,
 					inputTranslatorSettings,
 					outputTranslatorSettings);
 
-			if (bridgeResult.getSecond() == null) {
+			if (bridgeResult.getSecond().isEmpty()) {
 				// success
 				isBridgeInEndState = dbService.bridgeInitialized(detailsRecord.getHeader());
 				if (isBridgeInEndState) {
-					itDriver.abortBridge(dto.bridgeId(), model.getInterfaceTranslatorProperties());
+					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties());
 
 					throw new InvalidParameterException("Bridge is already in an end state");
 				}
 
 				return new TranslationNegotiationResponseDTO(
-						dto.bridgeId().toString(),
-						bridgeResult.getFirst());
+						bridgeId.toString(),
+						bridgeResult.getFirst().get());
 			}
 
 			// error in bridge initialization
-			throw bridgeResult.getSecond();
+			throw bridgeResult.getSecond().get();
 		} catch (final InvalidParameterException ex) {
 			if (storeException) {
-				dbService.storeBridgeProblem(dto.bridgeId(), ex.getMessage());
+				dbService.storeBridgeProblem(bridgeId, ex.getMessage());
 			}
 
 			throw new InvalidParameterException(ex.getMessage(), origin);
 		} catch (final ExternalServerError ex) {
 			if (storeException) {
-				dbService.storeBridgeProblem(dto.bridgeId(), ex.getMessage());
+				dbService.storeBridgeProblem(bridgeId, ex.getMessage());
 			}
 
 			throw new ExternalServerError(ex.getMessage(), origin);
 		} catch (final Exception ex) {
 			if (storeException) {
-				dbService.storeBridgeProblem(dto.bridgeId(), ex.getMessage());
+				dbService.storeBridgeProblem(bridgeId, ex.getMessage());
 			}
 
 			throw new InternalServerError(ex.getMessage(), origin);
@@ -281,14 +283,31 @@ public class TranslatorBridgeEngine {
 		final Map<String, Boolean> result = new HashMap<>(bridgeIds.size());
 
 		try {
-			// TODO: continue
-			// foreach every bridgeId
-			//   - in db find bridgeId, if found and can be set to abort set to abort
-			//   - if requester is specified, then the header's owner must be the requester (otherwise forbidden exception)
-			//   - return true only if abort is set in this transaction (false if not found or can't be set to abort)
-			//   - delete related discovery records if abort is happening
-			//   - also return old record
-			//   - after db, call interface translator's abort if necessary
+			bridgeIds.forEach(id -> {
+				final AbortResult dbResult = dbService.abortBridge(id, requester);
+				if (dbResult.abortHappened()) {
+					// abort in this transaction
+					result.put(id.toString(), true);
+					if (dbResult.fromStatus().isActiveStatus()) {
+						// need to tell the bridge to abort itself
+						final TranslationInterfaceTranslationDataDescriptorDTO interfaceTranslationData = Utilities.fromJson(
+								dbResult.detailsRecord().getInterfaceTranslatorData(),
+								TranslationInterfaceTranslationDataDescriptorDTO.class);
+						itDriver.abortBridge(id, interfaceTranslationData.interfaceProperties());
+					}
+				} else {
+					if (dbResult.fromStatus() == null) {
+						// unknown bridge id
+						result.put(id.toString(), false);
+					} else if (dbResult.fromStatus().isEndStatus()) {
+						// bridge is already in an end state
+						result.put(id.toString(), true);
+					} else {
+						// bridge is not aborted
+						result.put(id.toString(), false);
+					}
+				}
+			});
 
 			return result;
 		} catch (final ForbiddenException ex) {
@@ -302,7 +321,7 @@ public class TranslatorBridgeEngine {
 	// assistant methods
 
 	//-------------------------------------------------------------------------------------------------
-	private List<NormalizedServiceInstanceDTO> filterCandidates(final NormalizedTranslationDiscoveryRequestDTO dto, final Map<String, Boolean> discoveryFlags) {
+	private List<NormalizedServiceInstanceDTO> filterCandidates(final NormalizedTranslationDiscoveryRequestDTO dto, final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags) {
 		logger.debug("filterCandidates started...");
 
 		List<NormalizedServiceInstanceDTO> candidates = filterOutNotAppropriateCandidates(dto);
@@ -310,7 +329,7 @@ public class TranslatorBridgeEngine {
 			return List.of();
 		}
 
-		if (discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_CANDIDATES_BLACKLIST_CHECK, false)) {
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false)) {
 			// blacklist check for the remaining candidates
 			final List<String> notBlacklistedProviders = csDriver.filterOutBlacklistedSystems(candidates
 					.stream()
@@ -327,7 +346,7 @@ public class TranslatorBridgeEngine {
 			}
 		}
 
-		if (discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_CANDIDATES_AUTH_CHECK, false)) {
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false)) {
 			// authorization check that the consumer have access to providers' service/operation combination
 			final List<String> allowedProviders = csDriver.filterOutProvidersBecauseOfUnauthorization(
 					candidates.stream().map(c -> c.provider()).toList(),
@@ -469,7 +488,7 @@ public class TranslatorBridgeEngine {
 	//-------------------------------------------------------------------------------------------------
 	private List<ServiceInstanceResponseDTO> collectAppropriateInterfaceTranslators(
 			final NormalizedTranslationDiscoveryRequestDTO dto,
-			final Map<String, Boolean> discoveryFlags,
+			final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags,
 			final List<NormalizedServiceInstanceDTO> candidates) {
 		logger.debug("collectAppropriateInterfaceTranslators started...");
 
@@ -478,7 +497,7 @@ public class TranslatorBridgeEngine {
 			return List.of();
 		}
 
-		if (discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_TRANSLATORS_BLACKLIST_CHECK, false)) {
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false)) {
 			// blacklist check for the interface translator candidates
 			final List<String> notBlacklistedInterfaceTranslators = csDriver.filterOutBlacklistedSystems(interfaceTranslatorCandidates
 					.stream()
@@ -659,7 +678,7 @@ public class TranslatorBridgeEngine {
 	//-------------------------------------------------------------------------------------------------
 	private List<ServiceInstanceResponseDTO> collectAppropriateDataModelTranslators(
 			final List<TranslationDiscoveryModel> discoveryModels,
-			final Map<String, Boolean> discoveryFlags) {
+			final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags) {
 		logger.debug("collectAppropriateDataModelTranslators started...");
 
 		List<ServiceInstanceResponseDTO> dataModelTranslatorCandidates = csDriver.collectDataModelTranslatorCandidates(discoveryModels);
@@ -667,7 +686,7 @@ public class TranslatorBridgeEngine {
 			return List.of();
 		}
 
-		if (discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_TRANSLATORS_BLACKLIST_CHECK, false)) {
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false)) {
 			// blacklist check for the data model translator candidates
 			final List<String> notBlacklistedDataModelTranslators = csDriver.filterOutBlacklistedSystems(dataModelTranslatorCandidates
 					.stream()
@@ -693,7 +712,7 @@ public class TranslatorBridgeEngine {
 	private List<TranslationDiscoveryModel> extendDiscoveryModels(
 			final List<TranslationDiscoveryModel> models,
 			final List<ServiceInstanceResponseDTO> dataModelTranslatorCandidates,
-			final Map<String, Boolean> discoveryFlags) {
+			final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags) {
 		logger.debug("extendDiscoveryModels started...");
 
 		final List<TranslationDiscoveryModel> result = new ArrayList<>(models.size());
@@ -706,7 +725,7 @@ public class TranslatorBridgeEngine {
 				ServiceInstanceResponseDTO selectedInputDataModelTranslator = selectDataModelTranslator(
 						m,
 						dataModelTranslatorCandidates,
-						discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_TRANSLATORS_AUTH_CHECK, false),
+						discoveryFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false),
 						true);
 
 				if (selectedInputDataModelTranslator == null) {
@@ -730,7 +749,7 @@ public class TranslatorBridgeEngine {
 				ServiceInstanceResponseDTO selectedOutputDataModelTranslator = selectDataModelTranslator(
 						m,
 						dataModelTranslatorCandidates,
-						discoveryFlags.getOrDefault(TranslationManagerConstants.FLAG_TRANSLATORS_AUTH_CHECK, false),
+						discoveryFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false),
 						false);
 
 				if (selectedOutputDataModelTranslator == null) {

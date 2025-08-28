@@ -21,7 +21,6 @@ import java.util.UUID;
 public record NormalizedTranslationNegotiationRequestDTO(
 		UUID bridgeId,
 		NormalizedServiceInstanceDTO target,
-		String consumer,
 		String operation,
 		String interfaceTemplateName,
 		String inputDataModelId,

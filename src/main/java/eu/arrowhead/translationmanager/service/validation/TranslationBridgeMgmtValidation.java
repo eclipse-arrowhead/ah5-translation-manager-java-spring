@@ -16,13 +16,13 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service.validation;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
@@ -42,15 +42,14 @@ import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIde
 import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIdentifierValidator;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
-import eu.arrowhead.dto.TranslationDiscoveryRequestDTO;
-import eu.arrowhead.dto.TranslationNegotiationRequestDTO;
+import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.enums.ServiceInterfacePolicy;
+import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
-import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationNegotiationRequestDTO;
 
 @Service
-public class TranslationBridgeValidation {
+public class TranslationBridgeMgmtValidation {
 
 	//=================================================================================================
 	// members
@@ -117,43 +116,18 @@ public class TranslationBridgeValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public NormalizedTranslationDiscoveryRequestDTO validateAndNormalizeDiscoveryRequest(final String requester, final TranslationDiscoveryRequestDTO dto, final String origin) {
-		logger.debug("validateAndNormalizeDiscoveryRequest started...");
+	public Pair<NormalizedTranslationDiscoveryRequestDTO, Map<TranslationDiscoveryFlag, Boolean>> validateAndNormalizeDiscoveryMgmtRequest(
+			final String requester,
+			final TranslationDiscoveryMgmtRequestDTO dto,
+			final String origin) {
+		logger.debug("validateAndNormalizeDiscoveryMgmtRequest started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
-		validateDiscoveryRequest(dto, origin);
-		final NormalizedTranslationDiscoveryRequestDTO normalized = normalizeDiscoveryRequest(requester, dto);
-		validateNormalizedDiscoveryRequest(normalized, origin);
+		validateDiscoveryMgmtRequest(dto, origin);
+		final Pair<NormalizedTranslationDiscoveryRequestDTO, Map<TranslationDiscoveryFlag, Boolean>> normalized = normalizeDiscoveryMgmtRequest(requester, dto);
+		validateNormalizedDiscoveryMgmtRequest(normalized.getFirst(), origin);
 
 		return normalized;
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	public NormalizedTranslationNegotiationRequestDTO validateAndNormalizeNegotiationRequest(final TranslationNegotiationRequestDTO dto, final String origin) {
-		logger.debug("validateAndNormalizeNegotiationRequest started...");
-		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
-
-		validateNegotiationRequest(dto, origin);
-		final NormalizedTranslationNegotiationRequestDTO normalized = normalizeNegotiationRequest(dto);
-		validateNormalizedNegotiationRequest(normalized, origin);
-
-		return normalized;
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	public UUID validateAndNormalizeBridgeId(final String bridgeId, final String origin) {
-		logger.debug("validateAndNormalizeNegotiationRequest started...");
-		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
-
-		if (Utilities.isEmpty(bridgeId)) {
-			throw new InvalidParameterException("bridge identifier is missing");
-		}
-
-		try {
-			return UUID.fromString(bridgeId.trim());
-		} catch (final IllegalArgumentException __) {
-			throw new InvalidParameterException("bridge identifier is invalid");
-		}
 	}
 
 	//=================================================================================================
@@ -172,8 +146,8 @@ public class TranslationBridgeValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private void validateDiscoveryRequest(final TranslationDiscoveryRequestDTO dto, final String origin) {
-		logger.debug("validateDiscoveryRequest started...");
+	private void validateDiscoveryMgmtRequest(final TranslationDiscoveryMgmtRequestDTO dto, final String origin) {
+		logger.debug("validateDiscoveryMgmtRequest started...");
 
 		if (dto == null) {
 			throw new InvalidParameterException("request is missing", origin);
@@ -189,6 +163,10 @@ public class TranslationBridgeValidation {
 
 		dto.candidates().forEach(c -> validateCandidate(c, origin));
 
+		if (Utilities.isEmpty(dto.consumer())) {
+			throw new InvalidParameterException("consumer is missing", origin);
+		}
+
 		if (Utilities.isEmpty(dto.operation())) {
 			throw new InvalidParameterException("operation is missing", origin);
 		}
@@ -199,6 +177,20 @@ public class TranslationBridgeValidation {
 
 		if (Utilities.containsNullOrEmpty(dto.interfaceTemplateNames())) {
 			throw new InvalidParameterException("interface template names list contains null or empty element", origin);
+		}
+
+		if (!Utilities.isEmpty(dto.flags())) {
+			dto.flags()
+					.keySet()
+					.forEach(k -> {
+						if (Utilities.isEmpty(k)) {
+							throw new InvalidParameterException("flag name is missing", origin);
+						}
+
+						if (!Utilities.isEnumValue(k.trim().toUpperCase(), TranslationDiscoveryFlag.class)) {
+							throw new InvalidParameterException("flag is invalid: " + k, origin);
+						}
+					});
 		}
 	}
 
@@ -251,15 +243,15 @@ public class TranslationBridgeValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private void validateNormalizedDiscoveryRequest(final NormalizedTranslationDiscoveryRequestDTO normalized, final String origin) {
-		logger.debug("validateNormalizedDiscoveryRequest started...");
+	private void validateNormalizedDiscoveryMgmtRequest(final NormalizedTranslationDiscoveryRequestDTO normalized, final String origin) {
+		logger.debug("validateNormalizedDiscoveryMgmtRequest started...");
 
 		try {
 			// normalized createdBy is already validated
 			// discovery assumes that all candidate contains the same service definition
 			final String serviceDefinition = normalized.candidates().get(0).serviceDefinition();
 			normalized.candidates().forEach(c -> validateNormalizedCandidate(c, serviceDefinition));
-			// normalized consumer is already validated
+			systemNameValidator.validateSystemName(normalized.consumer());
 			operationValidator.validateServiceOperationName(normalized.operation());
 			normalized.interfaceTemplateNames().forEach(iName -> interfaceTemplateNameValidator.validateInterfaceTemplateName(iName));
 			if (normalized.inputDataModelId() != null) {
@@ -289,79 +281,22 @@ public class TranslationBridgeValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private void validateNegotiationRequest(final TranslationNegotiationRequestDTO dto, final String origin) {
-		logger.debug("validateNegotiationRequest started...");
-
-		if (dto == null) {
-			throw new InvalidParameterException("request is missing", origin);
-		}
-
-		if (dto.target() == null) {
-			throw new InvalidParameterException("Target is missing", origin);
-		}
-
-		if (!Utilities.isEmpty(dto.bridgeId())) {
-			// bridge id is defined => using data from database, only the target's instanceId is needed
-
-			if (Utilities.isEmpty(dto.target().instanceId())) {
-				throw new InvalidParameterException("Service instance id is missing", origin);
-			}
-		} else {
-			// bridge id is not defined => a discovery step will precede the negotiation step
-			final List<ServiceInstanceResponseDTO> candidates = new ArrayList<>(1);
-			candidates.add(dto.target());
-
-			final List<String> interfaceTemplateNames = new ArrayList<>(1);
-			interfaceTemplateNames.add(dto.interfaceTemplateName());
-
-			final TranslationDiscoveryRequestDTO discoveryRequest = new TranslationDiscoveryRequestDTO(
-					candidates,
-					dto.operation(),
-					interfaceTemplateNames,
-					dto.inputDataModelId(),
-					dto.outputDataModelId());
-			validateDiscoveryRequest(discoveryRequest, origin);
-		}
-	}
-
-	//-------------------------------------------------------------------------------------------------
-	private void validateNormalizedNegotiationRequest(final NormalizedTranslationNegotiationRequestDTO normalized, final String origin) {
-		logger.debug("validateNormalizedNegotiationRequest started...");
-
-		try {
-			if (normalized.bridgeId() == null) {
-				validateNormalizedCandidate(normalized.target(), normalized.target().serviceDefinition());
-				operationValidator.validateServiceOperationName(normalized.operation());
-				interfaceTemplateNameValidator.validateInterfaceTemplateName(normalized.interfaceTemplateName());
-				if (normalized.inputDataModelId() != null) {
-					dataModelIdentifierValidator.validateDataModelIdentifier(normalized.inputDataModelId());
-				}
-				if (normalized.outputDataModelId() != null) {
-					dataModelIdentifierValidator.validateDataModelIdentifier(normalized.outputDataModelId());
-				}
-			} else {
-				serviceInstanceIdentifierValidator.validateServiceInstanceIdentifier(normalized.target().instanceId());
-			}
-		} catch (final InvalidParameterException ex) {
-			throw new InvalidParameterException(ex.getMessage(), origin);
-		}
-	}
-
-	//-------------------------------------------------------------------------------------------------
 	// NORMALIZATION
 
 	//-------------------------------------------------------------------------------------------------
-	private NormalizedTranslationDiscoveryRequestDTO normalizeDiscoveryRequest(final String requester, final TranslationDiscoveryRequestDTO dto) {
-		logger.debug("normalizeDiscoveryRequest started...");
+	private Pair<NormalizedTranslationDiscoveryRequestDTO, Map<TranslationDiscoveryFlag, Boolean>> normalizeDiscoveryMgmtRequest(final String requester, final TranslationDiscoveryMgmtRequestDTO dto) {
+		logger.debug("normalizeDiscoveryMgmtRequest started...");
 
-		return new NormalizedTranslationDiscoveryRequestDTO(
-				requester,
-				dto.candidates().stream().map(c -> normalizeCandidate(c)).toList(),
-				requester,
-				operationNormalizer.normalize(dto.operation()),
-				dto.interfaceTemplateNames().stream().map(iName -> interfaceTemplateNameNormalizer.normalize(iName)).toList(),
-				dataModelIdentifierNormalizer.normalize(dto.inputDataModelId()),
-				dataModelIdentifierNormalizer.normalize(dto.outputDataModelId()));
+		return Pair.of(
+				new NormalizedTranslationDiscoveryRequestDTO(
+						requester,
+						dto.candidates().stream().map(c -> normalizeCandidate(c)).toList(),
+						systemNameNormalizer.normalize(dto.consumer()),
+						operationNormalizer.normalize(dto.operation()),
+						dto.interfaceTemplateNames().stream().map(iName -> interfaceTemplateNameNormalizer.normalize(iName)).toList(),
+						dataModelIdentifierNormalizer.normalize(dto.inputDataModelId()),
+						dataModelIdentifierNormalizer.normalize(dto.outputDataModelId())),
+				normalizeDiscoveryFlags(dto.flags()));
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -387,28 +322,20 @@ public class TranslationBridgeValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private NormalizedTranslationNegotiationRequestDTO normalizeNegotiationRequest(final TranslationNegotiationRequestDTO dto) {
-		logger.debug("normalizeNegotiationRequest started...");
+	private Map<TranslationDiscoveryFlag, Boolean> normalizeDiscoveryFlags(final Map<String, Boolean> flags) {
+		logger.debug("normalizeDiscoveryFlags started...");
 
-		NormalizedServiceInstanceDTO normalizedTarget = null;
-		if (Utilities.isEmpty(dto.bridgeId())) {
-			normalizedTarget = normalizeCandidate(dto.target());
-		} else {
-			// only the instance id is necessary
-
-			normalizedTarget = new NormalizedServiceInstanceDTO(
-					serviceInstanceIdentifierNormalizer.normalize(dto.target().instanceId()),
-					null,
-					null,
-					null);
+		if (Utilities.isEmpty(flags)) {
+			return Map.of();
 		}
 
-		return new NormalizedTranslationNegotiationRequestDTO(
-				Utilities.isEmpty(dto.bridgeId()) ? null : UUID.fromString(dto.bridgeId().trim()),
-				normalizedTarget,
-				operationNormalizer.normalize(dto.operation()),
-				interfaceTemplateNameNormalizer.normalize(dto.interfaceTemplateName()),
-				dataModelIdentifierNormalizer.normalize(dto.inputDataModelId()),
-				dataModelIdentifierNormalizer.normalize(dto.outputDataModelId()));
+		final Map<TranslationDiscoveryFlag, Boolean> result = new HashMap<>(flags.size());
+		flags.forEach((k, v) -> {
+			if (v != null) {
+				result.put(TranslationDiscoveryFlag.valueOf(k.trim().toUpperCase()), v);
+			}
+		});
+
+		return result;
 	}
 }

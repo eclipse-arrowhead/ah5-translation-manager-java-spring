@@ -31,7 +31,7 @@ import eu.arrowhead.dto.TranslationDiscoveryRequestDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationNegotiationRequestDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
-import eu.arrowhead.translationmanager.TranslationManagerConstants;
+import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationNegotiationRequestDTO;
@@ -65,12 +65,12 @@ public class TranslationBridgeService {
 
 		final String normalizedRequester = validator.validateAndNormalizeRequester(requester, origin);
 		final NormalizedTranslationDiscoveryRequestDTO normalized = validator.validateAndNormalizeDiscoveryRequest(normalizedRequester, dto, origin);
-		final Map<String, Boolean> discoveryFlags = Map.of(
-				TranslationManagerConstants.FLAG_CONSUMER_BLACKLIST_CHECK, false, // already checked in a filter (or blacklist is not used)
-				TranslationManagerConstants.FLAG_CANDIDATES_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
-				TranslationManagerConstants.FLAG_CANDIDATES_AUTH_CHECK, sysInfo.isAuthorizationEnabled(),
-				TranslationManagerConstants.FLAG_TRANSLATORS_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
-				TranslationManagerConstants.FLAG_TRANSLATORS_AUTH_CHECK, sysInfo.isAuthorizationEnabled());
+		final Map<TranslationDiscoveryFlag, Boolean> discoveryFlags = Map.of(
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false, // already checked in a filter (or blacklist is not used)
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, sysInfo.isAuthorizationEnabled(),
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, sysInfo.isAuthorizationEnabled());
 
 		return engine.doDiscovery(normalized, discoveryFlags, origin);
 	}
@@ -80,13 +80,13 @@ public class TranslationBridgeService {
 		logger.debug("negotiationOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
-		final String normalizedRequester = validator.validateAndNormalizeRequester(requester, origin);
-		NormalizedTranslationNegotiationRequestDTO normalized = validator.validateAndNormalizeNegotiationRequest(normalizedRequester, dto, origin);
+		NormalizedTranslationNegotiationRequestDTO normalized = validator.validateAndNormalizeNegotiationRequest(dto, origin);
 
 		if (normalized.bridgeId() == null) {
 			// discovery operation is not completed
+
 			final TranslationDiscoveryResponseDTO discoveryResult = discoveryOperation(
-					normalizedRequester,
+					requester,
 					new TranslationDiscoveryRequestDTO(
 							List.of(dto.target()),
 							normalized.operation(),
@@ -103,24 +103,23 @@ public class TranslationBridgeService {
 			normalized = new NormalizedTranslationNegotiationRequestDTO(
 					UUID.fromString(discoveryResult.bridgeId()),
 					normalized.target(),
-					normalized.consumer(),
 					normalized.operation(),
 					normalized.interfaceTemplateName(),
 					normalized.inputDataModelId(),
 					normalized.outputDataModelId());
 		}
 
-		return engine.doNegotiation(normalized, origin);
+		return engine.doNegotiation(normalized.bridgeId(), normalized.target().instanceId(), origin);
 	}
 
 	//-------------------------------------------------------------------------------------------------
 	public boolean abortOperation(final String requester, final String bridgeId, final String origin) {
 		logger.debug("abortOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
-		
+
 		final String normalizedRequester = validator.validateAndNormalizeRequester(requester, origin);
 		final UUID uuid = validator.validateAndNormalizeBridgeId(bridgeId, origin);
-		
+
 		final Map<String, Boolean> result = engine.doAbort(List.of(uuid), normalizedRequester, origin);
 
 		return result.get(uuid.toString());
