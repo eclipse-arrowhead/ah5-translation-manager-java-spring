@@ -16,7 +16,9 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service;
 
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,13 +28,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import eu.arrowhead.common.Utilities;
+import eu.arrowhead.dto.TranslationAbortMgmtResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
+import eu.arrowhead.dto.TranslationQueryListResponseDTO;
+import eu.arrowhead.dto.TranslationQueryRequestDTO;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
+import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.service.engine.TranslatorBridgeEngine;
 import eu.arrowhead.translationmanager.service.validation.TranslationBridgeMgmtValidation;
 
@@ -73,6 +79,28 @@ public class TranslationBridgeManagementService {
 		logger.debug("negotiationOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
+		final Pair<UUID, String> normalized = validator.validateAndNormalizeNegotiationMgmtRequest(dto, origin);
+
+		return engine.doNegotiation(normalized.getFirst(), normalized.getSecond(), origin);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public TranslationAbortMgmtResponseDTO abortOperation(final List<String> ids, final String origin) {
+		logger.debug("negotiationOperation started...");
+		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
+
+		final List<UUID> normalized = validator.validateAndNormalizeAbortMgmtRequest(ids, origin);
+		final Map<String, Boolean> result = engine.doAbort(normalized, null, origin);
+
+		return new TranslationAbortMgmtResponseDTO(result);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public TranslationQueryListResponseDTO queryOperation(final TranslationQueryRequestDTO dto, final String origin) {
+		logger.debug("queryOperation started...");
+		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
+
+		final NormalizedTranslationQueryRequestDTO normalized = validator.validateAndNormalizedQueryMgmtRequest(dto, origin);
 		// TODO: continue
 
 		return null;

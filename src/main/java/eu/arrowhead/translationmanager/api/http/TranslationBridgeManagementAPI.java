@@ -16,24 +16,32 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.api.http;
 
+import java.util.List;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import eu.arrowhead.common.Constants;
 import eu.arrowhead.dto.ErrorMessageDTO;
+import eu.arrowhead.dto.TranslationAbortMgmtResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
+import eu.arrowhead.dto.TranslationQueryListResponseDTO;
+import eu.arrowhead.dto.TranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.TranslationManagerConstants;
 import eu.arrowhead.translationmanager.api.http.utils.SystemNamePreprocessor;
 import eu.arrowhead.translationmanager.service.TranslationBridgeManagementService;
@@ -80,7 +88,7 @@ public class TranslationBridgeManagementAPI {
 					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) })
 	})
 	@PostMapping(path = TranslationManagerConstants.HTTP_API_OP_DISCOVERY_PATH, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public TranslationDiscoveryResponseDTO discovery(final HttpServletRequest httpServletRequest, @RequestBody final TranslationDiscoveryMgmtRequestDTO dto) {
+	public @ResponseBody TranslationDiscoveryResponseDTO discovery(final HttpServletRequest httpServletRequest, @RequestBody final TranslationDiscoveryMgmtRequestDTO dto) {
 		logger.debug("discovery started...");
 
 		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_MANAGEMENT_PATH + TranslationManagerConstants.HTTP_API_OP_DISCOVERY_PATH;
@@ -108,11 +116,57 @@ public class TranslationBridgeManagementAPI {
 	})
 	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping(path = TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public TranslationNegotiationResponseDTO negotiation(@RequestBody final TranslationNegotiationMgmtRequestDTO dto) {
+	public @ResponseBody TranslationNegotiationResponseDTO negotiation(@RequestBody final TranslationNegotiationMgmtRequestDTO dto) {
 		logger.debug("negotiation started...");
 
 		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH;
 
 		return mgmtService.negotiationOperation(dto, origin);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Operation(summary = "Aborts a list of translation bridges")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_OK, description = Constants.SWAGGER_HTTP_200_MESSAGE),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_BAD_REQUEST, description = Constants.SWAGGER_HTTP_400_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_UNAUTHORIZED, description = Constants.SWAGGER_HTTP_401_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_FORBIDDEN, description = Constants.SWAGGER_HTTP_403_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_INTERNAL_SERVER_ERROR, description = Constants.SWAGGER_HTTP_500_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_SERVICE_UNAVAILABLE, description = Constants.SWAGGER_HTTP_503_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) })
+	})
+	@DeleteMapping(path = TranslationManagerConstants.HTTP_API_OP_ABORT_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
+	public @ResponseBody TranslationAbortMgmtResponseDTO abort(@RequestParam final List<String> ids) {
+		logger.debug("abort started...");
+
+		final String origin = HttpMethod.DELETE.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_MANAGEMENT_PATH + TranslationManagerConstants.HTTP_API_OP_ABORT_PATH;
+
+		return mgmtService.abortOperation(ids, origin);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Operation(summary = "Returns the bridge details entries according to the query request")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_OK, description = Constants.SWAGGER_HTTP_200_MESSAGE),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_BAD_REQUEST, description = Constants.SWAGGER_HTTP_400_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_UNAUTHORIZED, description = Constants.SWAGGER_HTTP_401_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_FORBIDDEN, description = Constants.SWAGGER_HTTP_403_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) }),
+			@ApiResponse(responseCode = Constants.HTTP_STATUS_INTERNAL_SERVER_ERROR, description = Constants.SWAGGER_HTTP_500_MESSAGE, content = {
+					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) })
+	})
+	@PostMapping(path = TranslationManagerConstants.HTTP_API_OP_QUERY_PATH, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public @ResponseBody TranslationQueryListResponseDTO query(@RequestBody(required = false) final TranslationQueryRequestDTO dto) {
+		logger.debug("query started...");
+
+		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_MANAGEMENT_PATH + TranslationManagerConstants.HTTP_API_OP_QUERY_PATH;
+
+		return mgmtService.queryOperation(dto, origin);
 	}
 }

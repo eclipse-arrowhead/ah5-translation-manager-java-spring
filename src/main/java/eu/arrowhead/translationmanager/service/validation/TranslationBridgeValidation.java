@@ -301,7 +301,11 @@ public class TranslationBridgeValidation {
 		}
 
 		if (!Utilities.isEmpty(dto.bridgeId())) {
-			// bridge id is defined => using data from database, only the target's instanceId is needed
+			// bridge id is defined => using data from database, only the target's instanceId is needed (besides the bridge id)
+
+			if (!Utilities.isUUID(dto.bridgeId().trim())) {
+				throw new InvalidParameterException("Bridge id is invalid: " + dto.bridgeId(), origin);
+			}
 
 			if (Utilities.isEmpty(dto.target().instanceId())) {
 				throw new InvalidParameterException("Service instance id is missing", origin);

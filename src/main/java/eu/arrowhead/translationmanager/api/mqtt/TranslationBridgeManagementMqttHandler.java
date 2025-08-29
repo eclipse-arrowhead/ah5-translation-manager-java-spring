@@ -16,12 +16,16 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.api.mqtt;
 
+import java.util.List;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import eu.arrowhead.common.Constants;
 import eu.arrowhead.common.exception.ArrowheadException;
@@ -31,6 +35,8 @@ import eu.arrowhead.common.mqtt.handler.MqttTopicHandler;
 import eu.arrowhead.common.mqtt.model.MqttRequestModel;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
+import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
+import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
 import eu.arrowhead.translationmanager.TranslationManagerConstants;
 import eu.arrowhead.translationmanager.service.TranslationBridgeManagementService;
 
@@ -44,7 +50,7 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 	private final Logger logger = LogManager.getLogger(getClass());
 
 	@Autowired
-	private TranslationBridgeManagementService service;
+	private TranslationBridgeManagementService mgmtService;
 
 	//=================================================================================================
 	// methods
@@ -61,13 +67,24 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 		logger.debug("TranslationBridgeManagementMqttHandler.handle started");
 		Assert.isTrue(request.getBaseTopic().equals(baseTopic()), "MQTT topic-handler mismatch");
 
-		MqttStatus responseStatus = MqttStatus.OK;
+		final MqttStatus responseStatus = MqttStatus.OK;
 		Object responsePayload = null;
 
 		switch (request.getOperation()) {
 		case Constants.SERVICE_OP_DISCOVERY:
 			final TranslationDiscoveryMgmtRequestDTO discoveryDTO = readPayload(request.getPayload(), TranslationDiscoveryMgmtRequestDTO.class);
 			responsePayload = discovery(request.getRequester(), discoveryDTO);
+			break;
+
+		case Constants.SERVICE_OP_NEGOTIATION:
+			final TranslationNegotiationMgmtRequestDTO negotiationDTO = readPayload(request.getPayload(), TranslationNegotiationMgmtRequestDTO.class);
+			responsePayload = negotiation(negotiationDTO);
+			break;
+
+		case Constants.SERVICE_OP_ABORT:
+			final List<String> ids = readPayload(request.getPayload(), new TypeReference<List<String>>() {
+			});
+			responsePayload = abort(ids);
 			break;
 
 		default:
@@ -84,6 +101,20 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 	private TranslationDiscoveryResponseDTO discovery(final String requester, final TranslationDiscoveryMgmtRequestDTO discoveryDTO) {
 		logger.debug("TranslationBridgeManagementMqttHandler.discovery started");
 
-		return service.discoveryOperation(requester, discoveryDTO, baseTopic() + Constants.SERVICE_OP_DISCOVERY);
+		return mgmtService.discoveryOperation(requester, discoveryDTO, baseTopic() + Constants.SERVICE_OP_DISCOVERY);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private TranslationNegotiationResponseDTO negotiation(final TranslationNegotiationMgmtRequestDTO negotiationDTO) {
+		logger.debug("TranslationBridgeManagementMqttHandler.negotiation started");
+
+		return mgmtService.negotiationOperation(negotiationDTO, baseTopic() + Constants.SERVICE_OP_NEGOTIATION);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private Object abort(final List<String> ids) {
+		logger.debug("TranslationBridgeManagementMqttHandler.abort started");
+
+		return mgmtService.abortOperation(ids, baseTopic() + Constants.SERVICE_OP_ABORT);
 	}
 }

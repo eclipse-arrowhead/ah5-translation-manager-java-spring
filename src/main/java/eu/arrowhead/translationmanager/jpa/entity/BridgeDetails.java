@@ -16,7 +16,10 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.jpa.entity;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import eu.arrowhead.common.jpa.UnmodifiableArrowheadEntity;
 import jakarta.persistence.Column;
@@ -33,6 +36,35 @@ public class BridgeDetails {
 
 	//=================================================================================================
 	// members
+
+	public static final String SORT_NAME_HEADER_UUID = "header_uuid";
+	public static final String SORT_NAME_HEADER_CREATED_BY = "header_createdBy";
+	public static final String SORT_NAME_HEADER_STATUS = "header_status";
+	public static final String SORT_NAME_HEADER_USAGE_REPORT_COUNT = "header_usageReportCount";
+	public static final String SORT_NAME_HEADER_ALIVE_AT = "header_aliveAt";
+
+	public static final Map<String, String> SORT_NAME_ALTERNATIVES = Map.of(
+			"bridgeId", SORT_NAME_HEADER_UUID,
+			"uuid", SORT_NAME_HEADER_UUID,
+			"creator", SORT_NAME_HEADER_CREATED_BY,
+			"createdBy", SORT_NAME_HEADER_CREATED_BY,
+			"status", SORT_NAME_HEADER_STATUS,
+			"usage", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
+			"usageReportCount", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
+			"aliveAt", SORT_NAME_HEADER_ALIVE_AT);
+
+	public static final List<String> SORTABLE_FIELDS_BY = List.of(
+			SORT_NAME_HEADER_UUID,
+			SORT_NAME_HEADER_CREATED_BY,
+			SORT_NAME_HEADER_STATUS,
+			SORT_NAME_HEADER_USAGE_REPORT_COUNT,
+			SORT_NAME_HEADER_ALIVE_AT,
+			"consumer",
+			"provider",
+			"serviceDefinition");
+
+	public static final List<String> ACCEPTABLE_SORT_FIELDS = Stream.concat(SORTABLE_FIELDS_BY.stream(), SORT_NAME_ALTERNATIVES.keySet().stream()).toList();
+	public static final String DEFAULT_SORT_FIELD = SORT_NAME_HEADER_CREATED_BY;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -83,7 +84,7 @@ public class TranslationBridgeAPI {
 					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) })
 	})
 	@PostMapping(path = TranslationManagerConstants.HTTP_API_OP_DISCOVERY_PATH, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public TranslationDiscoveryResponseDTO discovery(final HttpServletRequest httpServletRequest, @RequestBody final TranslationDiscoveryRequestDTO dto) {
+	public @ResponseBody TranslationDiscoveryResponseDTO discovery(final HttpServletRequest httpServletRequest, @RequestBody final TranslationDiscoveryRequestDTO dto) {
 		logger.debug("discovery started...");
 
 		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_DISCOVERY_PATH;
@@ -111,7 +112,7 @@ public class TranslationBridgeAPI {
 	})
 	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping(path = TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH, consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public TranslationNegotiationResponseDTO negotiation(final HttpServletRequest httpServletRequest, @RequestBody final TranslationNegotiationRequestDTO dto) {
+	public @ResponseBody TranslationNegotiationResponseDTO negotiation(final HttpServletRequest httpServletRequest, @RequestBody final TranslationNegotiationRequestDTO dto) {
 		logger.debug("negotiation started...");
 
 		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH;
@@ -136,11 +137,11 @@ public class TranslationBridgeAPI {
 			@ApiResponse(responseCode = Constants.HTTP_STATUS_SERVICE_UNAVAILABLE, description = Constants.SWAGGER_HTTP_503_MESSAGE, content = {
 					@Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorMessageDTO.class)) })
 	})
-	@DeleteMapping(path = TranslationManagerConstants.HTTP_API_OP_ABORT_PATH)
+	@DeleteMapping(path = TranslationManagerConstants.HTTP_API_OP_ABORT_PATH_WITH_PARAM)
 	public ResponseEntity<Void> abort(final HttpServletRequest httpServletRequest, @PathVariable(required = true) final String bridgeId) {
 		logger.debug("abort started");
 
-		final String origin = HttpMethod.DELETE.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_ABORT_PATH
+		final String origin = HttpMethod.DELETE.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_ABORT_PATH_WITH_PARAM
 				.replace(TranslationManagerConstants.HTTP_PARAM_BRIDGE_ID, bridgeId);
 		final String requester = preprocessor.process(httpServletRequest, origin);
 		final boolean result = service.abortOperation(requester, bridgeId, origin);

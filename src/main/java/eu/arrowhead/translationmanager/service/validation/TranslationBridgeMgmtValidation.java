@@ -16,18 +16,25 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service.validation;
 
+import java.time.DateTimeException;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import eu.arrowhead.common.Utilities;
 import eu.arrowhead.common.exception.InvalidParameterException;
+import eu.arrowhead.common.service.PageService;
+import eu.arrowhead.common.service.validation.PageValidator;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierNormalizer;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierValidator;
 import eu.arrowhead.common.service.validation.name.InterfaceTemplateNameNormalizer;
@@ -40,13 +47,19 @@ import eu.arrowhead.common.service.validation.name.SystemNameNormalizer;
 import eu.arrowhead.common.service.validation.name.SystemNameValidator;
 import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIdentifierNormalizer;
 import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIdentifierValidator;
+import eu.arrowhead.dto.PageDTO;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
+import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
+import eu.arrowhead.dto.TranslationQueryRequestDTO;
 import eu.arrowhead.dto.enums.ServiceInterfacePolicy;
+import eu.arrowhead.dto.enums.TranslationBridgeStatus;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
+import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
+import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 
 @Service
 public class TranslationBridgeMgmtValidation {
@@ -92,6 +105,12 @@ public class TranslationBridgeMgmtValidation {
 	@Autowired
 	private DataModelIdentifierValidator dataModelIdentifierValidator;
 
+	@Autowired
+	private PageValidator pageValidator;
+
+	@Autowired
+	private PageService pageService;
+
 	//=================================================================================================
 	// methods
 
@@ -126,6 +145,53 @@ public class TranslationBridgeMgmtValidation {
 		validateDiscoveryMgmtRequest(dto, origin);
 		final Pair<NormalizedTranslationDiscoveryRequestDTO, Map<TranslationDiscoveryFlag, Boolean>> normalized = normalizeDiscoveryMgmtRequest(requester, dto);
 		validateNormalizedDiscoveryMgmtRequest(normalized.getFirst(), origin);
+
+		return normalized;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public Pair<UUID, String> validateAndNormalizeNegotiationMgmtRequest(final TranslationNegotiationMgmtRequestDTO dto, final String origin) {
+		logger.debug("validateAndNormalizeNegotiationMgmtRequest started...");
+		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
+
+		validateNegotiationMgmtRequest(dto, origin);
+		final Pair<UUID, String> normalized = normalizeNegotiationMgmtRequest(dto);
+
+		try {
+			serviceInstanceIdentifierValidator.validateServiceInstanceIdentifier(normalized.getSecond());
+		} catch (final InvalidParameterException ex) {
+			throw new InvalidParameterException(ex.getMessage(), origin);
+		}
+
+		return normalized;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public List<UUID> validateAndNormalizeAbortMgmtRequest(final List<String> ids, final String origin) {
+		logger.debug("validateAndNormalizeAbortMgmtRequest started...");
+		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
+
+		validateAbortMgmtRequest(ids, origin);
+
+		return ids
+				.stream()
+				.map(id -> {
+					try {
+						return UUID.fromString(id.trim());
+					} catch (final IllegalArgumentException __) {
+						throw new InvalidParameterException("bridge identifier is invalid: " + id, origin);
+					}
+				}).toList();
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public NormalizedTranslationQueryRequestDTO validateAndNormalizedQueryMgmtRequest(final TranslationQueryRequestDTO dto, final String origin) {
+		logger.debug("validateAndNormalizedQueryMgmtRequest started...");
+		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
+
+		validateQueryMgmtRequest(dto, origin);
+		final NormalizedTranslationQueryRequestDTO normalized = normalizeQueryMgmtRequest(dto);
+		validateNormalizedQueryMgmtRequest(normalized, origin);
 
 		return normalized;
 	}
@@ -281,6 +347,203 @@ public class TranslationBridgeMgmtValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	private void validateNegotiationMgmtRequest(final TranslationNegotiationMgmtRequestDTO dto, final String origin) {
+		logger.debug("validateNegotiationMgmtRequest started...");
+
+		if (dto == null) {
+			throw new InvalidParameterException("request is missing", origin);
+		}
+
+		if (Utilities.isEmpty(dto.bridgeId())) {
+			throw new InvalidParameterException("Bridge id is missing", origin);
+		}
+
+		if (!Utilities.isUUID(dto.bridgeId().trim())) {
+			throw new InvalidParameterException("Bridge id is invalid: " + dto.bridgeId(), origin);
+		}
+
+		if (Utilities.isEmpty(dto.targetInstanceId())) {
+			throw new InvalidParameterException("Target service instance id is missing", origin);
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private void validateAbortMgmtRequest(final List<String> ids, final String origin) {
+		logger.debug("validateAbortMgmtRequest started...");
+
+		if (Utilities.isEmpty(ids)) {
+			throw new InvalidParameterException("bridge id list is missing", origin);
+		}
+
+		if (Utilities.containsNullOrEmpty(ids)) {
+			throw new InvalidParameterException("bridge id list contains null or empty element", origin);
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private void validateQueryMgmtRequest(final TranslationQueryRequestDTO dto, final String origin) {
+		logger.debug("validateQueryMgmtRequest started...");
+
+		if (dto != null) {
+			// pagination
+			pageValidator.validatePageParameter(dto.pagination(), BridgeDetails.ACCEPTABLE_SORT_FIELDS, origin);
+
+			if (!Utilities.isEmpty(dto.bridgeIds())) {
+				if (Utilities.containsNullOrEmpty(dto.bridgeIds())) {
+					throw new InvalidParameterException("Bridge id list contains null or empty element", origin);
+				}
+
+				dto.bridgeIds()
+						.forEach(id -> {
+							if (!Utilities.isUUID(id.trim())) {
+								throw new InvalidParameterException("Bridge id is invalid: " + id, origin);
+							}
+						});
+			}
+
+			if (!Utilities.isEmpty(dto.creators())) {
+				if (Utilities.containsNullOrEmpty(dto.creators())) {
+					throw new InvalidParameterException("Creator list contains null or empty element", origin);
+				}
+			}
+
+			if (!Utilities.isEmpty(dto.statuses())) {
+				if (Utilities.containsNullOrEmpty(dto.statuses())) {
+					throw new InvalidParameterException("Status list contains null or empty element", origin);
+				}
+
+				dto.statuses()
+						.forEach(status -> {
+							if (!Utilities.isEnumValue(status.trim().toUpperCase(), TranslationBridgeStatus.class)) {
+								throw new InvalidParameterException("Invalid status: " + status, origin);
+							}
+						});
+			}
+
+			if (!Utilities.isEmpty(dto.consumers())) {
+				if (Utilities.containsNullOrEmpty(dto.consumers())) {
+					throw new InvalidParameterException("Consumer list contains null or empty element", origin);
+				}
+			}
+
+			if (!Utilities.isEmpty(dto.providers())) {
+				if (Utilities.containsNullOrEmpty(dto.providers())) {
+					throw new InvalidParameterException("Provider list contains null or empty element", origin);
+				}
+			}
+
+			if (!Utilities.isEmpty(dto.serviceDefinitions())) {
+				if (Utilities.containsNullOrEmpty(dto.serviceDefinitions())) {
+					throw new InvalidParameterException("Service definition list contains null or empty element", origin);
+				}
+			}
+
+			if (!Utilities.isEmpty(dto.interfaceTranslators())) {
+				if (Utilities.containsNullOrEmpty(dto.interfaceTranslators())) {
+					throw new InvalidParameterException("Interface translator list contains null or empty element", origin);
+				}
+			}
+
+			if (!Utilities.isEmpty(dto.dataModelTranslators())) {
+				if (Utilities.containsNullOrEmpty(dto.dataModelTranslators())) {
+					throw new InvalidParameterException("Data model translator list contains null or empty element", origin);
+				}
+			}
+
+			ZonedDateTime creationFrom = null;
+			if (!Utilities.isEmpty(dto.creationFrom())) {
+				try {
+					creationFrom = Utilities.parseUTCStringToZonedDateTime(dto.creationFrom());
+				} catch (final DateTimeException ex) {
+					throw new InvalidParameterException("Minimum creation time has an invalid time format", origin);
+				}
+			}
+
+			ZonedDateTime creationTo = null;
+			if (!Utilities.isEmpty(dto.creationTo())) {
+				try {
+					creationTo = Utilities.parseUTCStringToZonedDateTime(dto.creationTo());
+				} catch (final DateTimeException ex) {
+					throw new InvalidParameterException("Maximum creation time has an invalid time format", origin);
+				}
+			}
+
+			if (creationFrom != null && creationTo != null && creationTo.isBefore(creationFrom)) {
+				throw new InvalidParameterException("Empty creation time interval", origin);
+			}
+
+			ZonedDateTime aliveFrom = null;
+			if (!Utilities.isEmpty(dto.aliveFrom())) {
+				try {
+					aliveFrom = Utilities.parseUTCStringToZonedDateTime(dto.aliveFrom());
+				} catch (final DateTimeException ex) {
+					throw new InvalidParameterException("Minimum alive time has an invalid time format", origin);
+				}
+			}
+
+			ZonedDateTime aliveTo = null;
+			if (!Utilities.isEmpty(dto.aliveTo())) {
+				try {
+					aliveTo = Utilities.parseUTCStringToZonedDateTime(dto.aliveTo());
+				} catch (final DateTimeException ex) {
+					throw new InvalidParameterException("Maximum alive time has an invalid time format", origin);
+				}
+			}
+
+			if (aliveFrom != null && aliveTo != null && aliveTo.isBefore(aliveFrom)) {
+				throw new InvalidParameterException("Empty alive time interval", origin);
+			}
+
+			if (dto.minUsage() != null && dto.minUsage().intValue() < 0) {
+				throw new InvalidParameterException("Minimum usage number is a non-negative number", origin);
+			}
+
+			if (dto.minUsage() != null && dto.minUsage() != null && dto.minUsage().intValue() > dto.maxUsage().intValue()) {
+				throw new InvalidParameterException("Empty usage interval", origin);
+			}
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private void validateNormalizedQueryMgmtRequest(final NormalizedTranslationQueryRequestDTO dto, final String origin) {
+		logger.debug("validateNormalizedQueryMgmtRequest started...");
+
+		try {
+			if (!Utilities.isEmpty(dto.creators())) {
+				dto.creators()
+						.forEach(c -> systemNameValidator.validateSystemName(c));
+			}
+
+			if (!Utilities.isEmpty(dto.consumers())) {
+				dto.consumers()
+						.forEach(c -> systemNameValidator.validateSystemName(c));
+			}
+
+			if (!Utilities.isEmpty(dto.providers())) {
+				dto.providers()
+						.forEach(p -> systemNameValidator.validateSystemName(p));
+			}
+
+			if (!Utilities.isEmpty(dto.serviceDefinitions())) {
+				dto.serviceDefinitions()
+						.forEach(s -> serviceDefinitionNameValidator.validateServiceDefinitionName(s));
+			}
+
+			if (!Utilities.isEmpty(dto.interfaceTranslators())) {
+				dto.interfaceTranslators()
+						.forEach(it -> systemNameValidator.validateSystemName(it));
+			}
+
+			if (!Utilities.isEmpty(dto.dataModelTranslators())) {
+				dto.dataModelTranslators()
+						.forEach(dmt -> systemNameValidator.validateSystemName(dmt));
+			}
+		} catch (final InvalidParameterException ex) {
+			throw new InvalidParameterException(ex.getMessage(), origin);
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	// NORMALIZATION
 
 	//-------------------------------------------------------------------------------------------------
@@ -337,5 +600,63 @@ public class TranslationBridgeMgmtValidation {
 		});
 
 		return result;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private Pair<UUID, String> normalizeNegotiationMgmtRequest(final TranslationNegotiationMgmtRequestDTO dto) {
+		logger.debug("normalizeNegotiationMgmtRequest started...");
+
+		return Pair.of(
+				UUID.fromString(dto.bridgeId().trim()),
+				serviceInstanceIdentifierNormalizer.normalize(dto.targetInstanceId()));
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private NormalizedTranslationQueryRequestDTO normalizeQueryMgmtRequest(final TranslationQueryRequestDTO dto) {
+		logger.debug("normalizeQueryMgmtRequest started...");
+
+		if (dto == null) {
+			return new NormalizedTranslationQueryRequestDTO(
+					pageService.getPageRequest(null, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter"),
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null,
+					null);
+		}
+
+		final PageDTO normalizedPagination = dto.pagination() == null || Utilities.isEmpty(dto.pagination().sortField())
+				? dto.pagination()
+				: new PageDTO(
+						dto.pagination().page(),
+						dto.pagination().size(),
+						dto.pagination().direction(),
+						BridgeDetails.SORT_NAME_ALTERNATIVES.getOrDefault(dto.pagination().sortField().trim(), dto.pagination().sortField()));
+
+		return new NormalizedTranslationQueryRequestDTO(
+				pageService.getPageRequest(normalizedPagination, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter"),
+				Utilities.isEmpty(dto.bridgeIds()) ? null : dto.bridgeIds().stream().map(id -> UUID.fromString(id.trim())).toList(),
+				Utilities.isEmpty(dto.creators()) ? null : dto.creators().stream().map(c -> systemNameNormalizer.normalize(c)).toList(),
+				Utilities.isEmpty(dto.statuses()) ? null : dto.statuses().stream().map(s -> TranslationBridgeStatus.valueOf(s.trim().toUpperCase())).toList(),
+				Utilities.isEmpty(dto.consumers()) ? null : dto.consumers().stream().map(c -> systemNameNormalizer.normalize(c)).toList(),
+				Utilities.isEmpty(dto.providers()) ? null : dto.providers().stream().map(p -> systemNameNormalizer.normalize(p)).toList(),
+				Utilities.isEmpty(dto.serviceDefinitions()) ? null : dto.serviceDefinitions().stream().map(s -> serviceDefinitionNameNormalizer.normalize(s)).toList(),
+				Utilities.isEmpty(dto.interfaceTranslators()) ? null : dto.interfaceTranslators().stream().map(it -> systemNameNormalizer.normalize(it)).toList(),
+				Utilities.isEmpty(dto.dataModelTranslators()) ? null : dto.dataModelTranslators().stream().map(dmt -> systemNameNormalizer.normalize(dmt)).toList(),
+				Utilities.parseUTCStringToZonedDateTime(dto.creationFrom()),
+				Utilities.parseUTCStringToZonedDateTime(dto.creationTo()),
+				Utilities.parseUTCStringToZonedDateTime(dto.aliveFrom()),
+				Utilities.parseUTCStringToZonedDateTime(dto.aliveTo()),
+				dto.minUsage(),
+				dto.maxUsage());
 	}
 }

@@ -51,7 +51,9 @@ public final class TranslationManagerConstants {
 	public static final String HTTP_API_OP_DISCOVERY_PATH = "/discovery";
 	public static final String HTTP_API_OP_NEGOTIATION_PATH = "/negotiation";
 	public static final String HTTP_PARAM_BRIDGE_ID = "{bridgeId}";
-	public static final String HTTP_API_OP_ABORT_PATH = "/abort/" + HTTP_PARAM_BRIDGE_ID;
+	public static final String HTTP_API_OP_ABORT_PATH = "/abort";
+	public static final String HTTP_API_OP_ABORT_PATH_WITH_PARAM = HTTP_API_OP_ABORT_PATH + "/" + HTTP_PARAM_BRIDGE_ID;
+	public static final String HTTP_API_OP_QUERY_PATH = "/query";
 
 	//=================================================================================================
 	// assistant methods
