@@ -21,12 +21,18 @@ import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import eu.arrowhead.common.Utilities;
 import eu.arrowhead.dto.TranslationBridgeCandidateDTO;
+import eu.arrowhead.dto.TranslationDataModelTranslationDataDescriptorDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
+import eu.arrowhead.dto.TranslationInterfaceTranslationDataDescriptorDTO;
+import eu.arrowhead.dto.TranslationQueryListResponseDTO;
+import eu.arrowhead.dto.TranslationQueryResponseDTO;
+import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 
 @Service
 public class DTOConverter {
@@ -49,8 +55,39 @@ public class DTOConverter {
 		return new TranslationDiscoveryResponseDTO(
 				bridgeId.toString(),
 				models
-					.stream()
-					.map(m -> new TranslationBridgeCandidateDTO(m.getTargetInstanceId(), m.getToInterfaceTemplate()))
-					.toList());
+						.stream()
+						.map(m -> new TranslationBridgeCandidateDTO(m.getTargetInstanceId(), m.getToInterfaceTemplate()))
+						.toList());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public TranslationQueryListResponseDTO convertBridgeDetailsPage(final Page<BridgeDetails> page) {
+		logger.debug("convertBridgeDetailsPage started...");
+		Assert.notNull(page, "page is null");
+
+		final List<TranslationQueryResponseDTO> result = page
+				.stream()
+				.map(e -> new TranslationQueryResponseDTO(
+						e.getHeader().getUuid(),
+						e.getHeader().getStatus().name(),
+						e.getHeader().getUsageReportCount(),
+						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getAliveAt()),
+						e.getHeader().getMessage(),
+						e.getConsumer(),
+						e.getProvider(),
+						e.getServiceDefinition(),
+						e.getOperation(),
+						e.getInterfaceTranslator(),
+						Utilities.fromJson(e.getInterfaceTranslatorData(), TranslationInterfaceTranslationDataDescriptorDTO.class),
+						e.getInputDmTranslator(),
+						Utilities.fromJson(e.getInputDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
+						e.getResultDmTranslator(),
+						Utilities.fromJson(e.getResultDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
+						e.getHeader().getCreatedBy(),
+						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getCreatedAt()),
+						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getUpdatedAt())))
+				.toList();
+
+		return new TranslationQueryListResponseDTO(result, page.getTotalElements());
 	}
 }

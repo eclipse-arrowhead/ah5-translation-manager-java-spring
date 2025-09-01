@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -37,6 +38,9 @@ import eu.arrowhead.dto.TranslationQueryListResponseDTO;
 import eu.arrowhead.dto.TranslationQueryRequestDTO;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
+import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
+import eu.arrowhead.translationmanager.jpa.service.BridgeDbService;
+import eu.arrowhead.translationmanager.service.dto.DTOConverter;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.service.engine.TranslatorBridgeEngine;
@@ -58,6 +62,12 @@ public class TranslationBridgeManagementService {
 
 	@Autowired
 	private TranslatorBridgeEngine engine;
+	
+	@Autowired
+	private BridgeDbService dbService;
+	
+	@Autowired
+	private DTOConverter converter;
 
 	//=================================================================================================
 	// methods
@@ -101,9 +111,9 @@ public class TranslationBridgeManagementService {
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		final NormalizedTranslationQueryRequestDTO normalized = validator.validateAndNormalizedQueryMgmtRequest(dto, origin);
-		// TODO: continue
-
-		return null;
+		final Page<BridgeDetails> page = dbService.getBridgeDetailsPage(normalized);
+		
+		return converter.convertBridgeDetailsPage(page);
 	}
 
 	//=================================================================================================

@@ -17,13 +17,16 @@
 package eu.arrowhead.translationmanager.jpa.service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +45,7 @@ import eu.arrowhead.translationmanager.jpa.entity.BridgeHeader;
 import eu.arrowhead.translationmanager.jpa.repository.BridgeDetailsRepository;
 import eu.arrowhead.translationmanager.jpa.repository.BridgeDiscoveryRepository;
 import eu.arrowhead.translationmanager.jpa.repository.BridgeHeaderRepository;
+import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationReportRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.TranslationDiscoveryModel;
 
@@ -61,6 +65,8 @@ public class BridgeDbService {
 
 	@Autowired
 	private BridgeDiscoveryRepository discoveryRepository;
+
+	private static final Object LOCK = new Object();
 
 	//=================================================================================================
 	// methods
@@ -96,16 +102,18 @@ public class BridgeDbService {
 				throw new InvalidParameterException("Invalid reporting case");
 			}
 
-			header.setStatus(toStatus);
-			header.setAliveAt(dto.timestamp());
-			if (TranslationBridgeStatus.USED == toStatus) {
-				header.setUsageReportCount(header.getUsageReportCount() + 1);
-			}
-			if (!Utilities.isEmpty(dto.errorMessage())) {
-				header.setMessage(dto.errorMessage());
-			}
+			synchronized (LOCK) {
+				header.setStatus(toStatus);
+				header.setAliveAt(dto.timestamp());
+				if (TranslationBridgeStatus.USED == toStatus) {
+					header.setUsageReportCount(header.getUsageReportCount() + 1);
+				}
+				if (!Utilities.isEmpty(dto.errorMessage())) {
+					header.setMessage(dto.errorMessage());
+				}
 
-			headerRepository.saveAndFlush(header);
+				headerRepository.saveAndFlush(header);
+			}
 		} catch (final InvalidParameterException | ForbiddenException ex) {
 			throw ex;
 		} catch (final Exception ex) {
@@ -130,11 +138,13 @@ public class BridgeDbService {
 				discoveries.add(new BridgeDiscovery(header, Utilities.toJson(model)));
 			}
 
-			header = headerRepository.saveAndFlush(header);
-			discoveries = discoveryRepository.saveAllAndFlush(discoveries);
+			synchronized (LOCK) {
+				header = headerRepository.saveAndFlush(header);
+				discoveries = discoveryRepository.saveAllAndFlush(discoveries);
 
-			header.setStatus(TranslationBridgeStatus.DISCOVERED);
-			header = headerRepository.saveAndFlush(header);
+				header.setStatus(TranslationBridgeStatus.DISCOVERED);
+				header = headerRepository.saveAndFlush(header);
+			}
 
 			return Pair.of(header, discoveries);
 		} catch (final Exception ex) {
@@ -170,31 +180,33 @@ public class BridgeDbService {
 				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId);
 			}
 
-			// setting status
-			header.setStatus(TranslationBridgeStatus.PENDING);
-			header = headerRepository.saveAndFlush(header);
+			synchronized (LOCK) {
+				// setting status
+				header.setStatus(TranslationBridgeStatus.PENDING);
+				header = headerRepository.saveAndFlush(header);
 
-			// removing discovery records
-			discoveryRepository.deleteByHeader(header);
-			discoveryRepository.flush();
+				// removing discovery records
+				discoveryRepository.deleteByHeader(header);
+				discoveryRepository.flush();
 
-			// creating details record
-			final TranslationDiscoveryModel model = modelOpt.get();
-			BridgeDetails details = new BridgeDetails(
-					header,
-					model.getConsumer(),
-					model.getProvider(),
-					model.getServiceDefinition(),
-					model.getOperation(),
-					model.getInterfaceTranslator(),
-					"", // will be set later
-					model.getInputDataModelTranslator(),
-					null, // will be set later if necessary
-					model.getOutputDataModelTranslator(),
-					null); // will be set later if necessary
-			details = detailsRepository.saveAndFlush(details);
+				// creating details record
+				final TranslationDiscoveryModel model = modelOpt.get();
+				BridgeDetails details = new BridgeDetails(
+						header,
+						model.getConsumer(),
+						model.getProvider(),
+						model.getServiceDefinition(),
+						model.getOperation(),
+						model.getInterfaceTranslator(),
+						"", // will be set later
+						model.getInputDataModelTranslator(),
+						null, // will be set later if necessary
+						model.getOutputDataModelTranslator(),
+						null); // will be set later if necessary
+				details = detailsRepository.saveAndFlush(details);
 
-			return Pair.of(model, details);
+				return Pair.of(model, details);
+			}
 		} catch (final InvalidParameterException ex) {
 			throw ex;
 		} catch (final Exception ex) {
@@ -217,7 +229,9 @@ public class BridgeDbService {
 					return true;
 				}
 
-				detailsRepository.saveAndFlush(record);
+				synchronized (LOCK) {
+					detailsRepository.saveAndFlush(record);
+				}
 			}
 
 			return false;
@@ -236,8 +250,10 @@ public class BridgeDbService {
 
 		try {
 			if (TranslationBridgeStatus.PENDING == header.getStatus()) {
-				header.setStatus(TranslationBridgeStatus.INITIALIZED);
-				headerRepository.saveAndFlush(header);
+				synchronized (LOCK) {
+					header.setStatus(TranslationBridgeStatus.INITIALIZED);
+					headerRepository.saveAndFlush(header);
+				}
 			} else if (header.getStatus().isEndStatus()) {
 				return true;
 			}
@@ -261,9 +277,11 @@ public class BridgeDbService {
 			final Optional<BridgeHeader> headerOpt = headerRepository.findByUuid(bridgeId.toString());
 			if (headerOpt.isPresent() && TranslationBridgeStatus.isValidTransition(headerOpt.get().getStatus(), TranslationBridgeStatus.ERROR)) {
 				final BridgeHeader header = headerOpt.get();
-				header.setStatus(TranslationBridgeStatus.ERROR);
-				header.setMessage(errorMessage);
-				headerRepository.saveAndFlush(header);
+				synchronized (LOCK) {
+					header.setStatus(TranslationBridgeStatus.ERROR);
+					header.setMessage(errorMessage);
+					headerRepository.saveAndFlush(header);
+				}
 			}
 		} catch (final Exception ex) {
 			// can't store a bridge problem in the db, so we store it at least in the log
@@ -300,12 +318,14 @@ public class BridgeDbService {
 				// delete related discovery records (if any)
 				discoveryRepository.deleteByHeader(header);
 
-				header.setStatus(TranslationBridgeStatus.ABORTED);
-				header = headerRepository.saveAndFlush(header);
+				synchronized (LOCK) {
+					header.setStatus(TranslationBridgeStatus.ABORTED);
+					header = headerRepository.saveAndFlush(header);
 
-				final Optional<BridgeDetails> detailsOpt = detailsRepository.findByHeader(header);
+					final Optional<BridgeDetails> detailsOpt = detailsRepository.findByHeader(header);
 
-				return new AbortResult(true, oldStatus, detailsOpt.isEmpty() ? null : detailsOpt.get());
+					return new AbortResult(true, oldStatus, detailsOpt.isEmpty() ? null : detailsOpt.get());
+				}
 			}
 
 			// already aborted, closed or in error state
@@ -317,6 +337,25 @@ public class BridgeDbService {
 			logger.debug(ex);
 			throw new InternalServerError("Database operation error");
 		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public Page<BridgeDetails> getBridgeDetailsPage(final NormalizedTranslationQueryRequestDTO dto) {
+		logger.debug("getBridgeDetails started...");
+		Assert.notNull(dto, "dto is missing");
+
+		try {
+			if (!dto.hasAnyFilter()) {
+				return detailsRepository.findAll(dto.pageRequest());
+			}
+
+			return getBridgeDetailsPageByFilters(dto);
+		} catch (final Exception ex) {
+			logger.error(ex.getMessage());
+			logger.debug(ex);
+			throw new InternalServerError("Database operation error");
+		}
+
 	}
 
 	//=================================================================================================
@@ -336,6 +375,120 @@ public class BridgeDbService {
 		return Optional.empty();
 	}
 
+	//-------------------------------------------------------------------------------------------------
+	private Page<BridgeDetails> getBridgeDetailsPageByFilters(final NormalizedTranslationQueryRequestDTO dto) {
+		logger.debug("getBridgeDetailsByFilters started...");
+
+		BaseFilter baseFilter = BaseFilter.NONE;
+		synchronized (LOCK) {
+			List<BridgeDetails> toFilter = null;
+			if (!Utilities.isEmpty(dto.bridgeIds())) {
+				toFilter = detailsRepository.findByHeader_UuidIn(dto.bridgeIds()
+						.stream()
+						.map(UUID::toString)
+						.toList());
+				baseFilter = BaseFilter.BRIDGE_ID;
+			} else if (!Utilities.isEmpty(dto.consumers())) {
+				toFilter = detailsRepository.findByConsumerIn(dto.consumers());
+				baseFilter = BaseFilter.CONSUMER;
+			} else if (!Utilities.isEmpty(dto.providers())) {
+				toFilter = detailsRepository.findByProviderIn(dto.providers());
+				baseFilter = BaseFilter.PROVIDER;
+			} else if (!Utilities.isEmpty(dto.serviceDefinitions())) {
+				toFilter = detailsRepository.findByServiceDefinitionIn(dto.serviceDefinitions());
+				baseFilter = BaseFilter.SERVICE_DEF;
+			} else if (!Utilities.isEmpty(dto.interfaceTranslators())) {
+				toFilter = detailsRepository.findByInterfaceTranslatorIn(dto.interfaceTranslators());
+			} else if (!Utilities.isEmpty(dto.statuses())) {
+				toFilter = detailsRepository.findByHeader_StatusIn(dto.statuses());
+				baseFilter = BaseFilter.STATUS;
+			} else if (!Utilities.isEmpty(dto.creators())) {
+				toFilter = detailsRepository.findByHeader_CreatedByIn(dto.creators());
+				baseFilter = BaseFilter.CREATED_BY;
+			} else {
+				toFilter = detailsRepository.findAll();
+			}
+
+			final Set<Long> matchingIds = new HashSet<>();
+			for (final BridgeDetails record : toFilter) {
+				// Match against bridge ids is not needed since if bridge ids is defined then the toFilter list only contains matching records
+
+				// Match against consumers
+				if (baseFilter != BaseFilter.CONSUMER && !Utilities.isEmpty(dto.consumers()) && !dto.consumers().contains(record.getConsumer())) {
+					continue;
+				}
+
+				// Match against providers
+				if (baseFilter != BaseFilter.PROVIDER && !Utilities.isEmpty(dto.providers()) && !dto.providers().contains(record.getProvider())) {
+					continue;
+				}
+
+				// Match against service definitions
+				if (baseFilter != BaseFilter.SERVICE_DEF && !Utilities.isEmpty(dto.serviceDefinitions()) && !dto.serviceDefinitions().contains(record.getServiceDefinition())) {
+					continue;
+				}
+
+				// Match against interface translators
+				if (baseFilter != BaseFilter.INTERFACE_TRANSLATOR && !Utilities.isEmpty(dto.interfaceTranslators()) && !dto.interfaceTranslators().contains(record.getInterfaceTranslator())) {
+					continue;
+				}
+
+				// Match against statuses
+				if (baseFilter != BaseFilter.STATUS && !Utilities.isEmpty(dto.statuses()) && !dto.statuses().contains(record.getHeader().getStatus())) {
+					continue;
+				}
+
+				// Match against creators
+				if (baseFilter != BaseFilter.CREATED_BY && !Utilities.isEmpty(dto.creators()) && !dto.creators().contains(record.getHeader().getCreatedBy())) {
+					continue;
+				}
+
+				// Match against data model translators
+				if (!Utilities.isEmpty(dto.dataModelTranslators())
+						&& !dto.dataModelTranslators().contains(record.getInputDmTranslator())
+						&& !dto.dataModelTranslators().contains(record.getResultDmTranslator())) {
+					continue;
+				}
+
+				// Match against creation from
+				if (dto.creationFrom() != null && record.getHeader().getCreatedAt().isBefore(dto.creationFrom())) {
+					continue;
+				}
+
+				// Match against creation to
+				if (dto.creationTo() != null && record.getHeader().getCreatedAt().isAfter(dto.creationTo())) {
+					continue;
+				}
+
+				// Match against alive from
+				if (dto.aliveFrom() != null
+						&& (record.getHeader().getAliveAt() == null || record.getHeader().getAliveAt().isBefore(dto.aliveFrom()))) {
+					continue;
+				}
+
+				// Match against alive to
+				if (dto.aliveTo() != null
+						&& (record.getHeader().getAliveAt() == null || record.getHeader().getAliveAt().isAfter(dto.aliveTo()))) {
+					continue;
+				}
+
+				// Match against min usage
+				if (dto.minUsage() != null && record.getHeader().getUsageReportCount() < dto.minUsage().intValue()) {
+					continue;
+				}
+
+				// Match against max usage
+				if (dto.maxUsage() != null && record.getHeader().getUsageReportCount() > dto.maxUsage().intValue()) {
+					continue;
+				}
+
+				matchingIds.add(record.getId());
+			}
+
+			return detailsRepository.findAllByIdIn(matchingIds, dto.pageRequest());
+		}
+	}
+
 	//=================================================================================================
 	// nested structures
 
@@ -346,4 +499,8 @@ public class BridgeDbService {
 			BridgeDetails detailsRecord) {
 	}
 
+	//-------------------------------------------------------------------------------------------------
+	private enum BaseFilter {
+		NONE, BRIDGE_ID, CONSUMER, PROVIDER, SERVICE_DEF, INTERFACE_TRANSLATOR, STATUS, CREATED_BY
+	}
 }

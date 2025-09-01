@@ -16,11 +16,16 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.jpa.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import eu.arrowhead.common.jpa.RefreshableRepository;
+import eu.arrowhead.dto.enums.TranslationBridgeStatus;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeHeader;
 
@@ -32,4 +37,31 @@ public interface BridgeDetailsRepository extends RefreshableRepository<BridgeDet
 
 	//-------------------------------------------------------------------------------------------------
 	public Optional<BridgeDetails> findByHeader(final BridgeHeader header);
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MethodNameCheck")
+	public List<BridgeDetails> findByHeader_UuidIn(final List<String> uuids);
+
+	//-------------------------------------------------------------------------------------------------
+	public List<BridgeDetails> findByConsumerIn(final List<String> consumers);
+
+	//-------------------------------------------------------------------------------------------------
+	public List<BridgeDetails> findByProviderIn(final List<String> providers);
+
+	//-------------------------------------------------------------------------------------------------
+	public List<BridgeDetails> findByServiceDefinitionIn(final List<String> serviceDefinitions);
+
+	//-------------------------------------------------------------------------------------------------
+	public List<BridgeDetails> findByInterfaceTranslatorIn(final List<String> interfaceTranslators);
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MethodNameCheck")
+	public List<BridgeDetails> findByHeader_CreatedByIn(final List<String> creators);
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MethodNameCheck")
+	public List<BridgeDetails> findByHeader_StatusIn(final List<TranslationBridgeStatus> statuses);
+
+	//-------------------------------------------------------------------------------------------------
+	public Page<BridgeDetails> findAllByIdIn(final Collection<Long> ids, final Pageable pageable);
 }

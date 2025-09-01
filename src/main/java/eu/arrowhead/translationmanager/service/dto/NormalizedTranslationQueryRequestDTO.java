@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
 
+import eu.arrowhead.common.Utilities;
 import eu.arrowhead.dto.enums.TranslationBridgeStatus;
 
 public record NormalizedTranslationQueryRequestDTO(
@@ -40,4 +41,25 @@ public record NormalizedTranslationQueryRequestDTO(
 		ZonedDateTime aliveTo,
 		Integer minUsage,
 		Integer maxUsage) {
+
+	//=================================================================================================
+	// methods
+
+	//-------------------------------------------------------------------------------------------------
+	public boolean hasAnyFilter() {
+		return !Utilities.isEmpty(bridgeIds)
+				|| !Utilities.isEmpty(creators)
+				|| !Utilities.isEmpty(statuses)
+				|| !Utilities.isEmpty(consumers)
+				|| !Utilities.isEmpty(providers)
+				|| !Utilities.isEmpty(serviceDefinitions)
+				|| !Utilities.isEmpty(interfaceTranslators)
+				|| !Utilities.isEmpty(dataModelTranslators)
+				|| creationFrom != null
+				|| creationTo != null
+				|| aliveFrom != null
+				|| aliveTo != null
+				|| minUsage != null
+				|| maxUsage != null;
+	}
 }
