@@ -18,6 +18,7 @@ package eu.arrowhead.translationmanager.service.engine;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,9 @@ public class CoreSystemsDriver {
 
 	//=================================================================================================
 	// members
+
+	private static final int tokenIntervalForInterfaceBridgeManagement = 24; // in hours
+	private static final int tokenUsageLimitForInterfaceBridgeManagement = 100; // in hours
 
 	@Value(TranslationManagerConstants.$TRANSLATOR_SERVICE_MIN_AVAILABILITY_WD)
 	private int translatorServiceMinAvailability;
@@ -189,20 +193,46 @@ public class CoreSystemsDriver {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public String generateTokenForInterfaceTranslator(
+	public Map<String, String> generateTokenForManagerToInterfaceBridgeManagementService(final List<ServiceInstanceResponseDTO> interfaceTranslators) {
+		logger.debug("generateTokenForManagerToInterfaceBridgeManagementService started...");
+		Assert.isTrue(!Utilities.isEmpty(interfaceTranslators), "interfaceTranslators list is missing");
+		Assert.isTrue(!Utilities.containsNull(interfaceTranslators), "interfaceTranslators list contains null value");
+
+		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayloadForInterfaceBridgeManagementService(interfaceTranslators);
+
+		final AuthorizationTokenMgmtListResponseDTO response = ahHttpService.consumeService(
+				Constants.SERVICE_DEF_AUTHORIZATION_TOKEN_MANAGEMENT,
+				Constants.SERVICE_OP_AUTHORIZATION_GENERATE_TOKENS,
+				Constants.SYS_NAME_CONSUMER_AUTHORIZATION,
+				AuthorizationTokenMgmtListResponseDTO.class,
+				payload,
+				new LinkedMultiValueMap<>(Map.of(Constants.UNBOUND, List.of(Boolean.TRUE.toString()))));
+
+		final Map<String, String> result = new HashMap<>(response.entries().size());
+
+		response.entries()
+				.forEach(e ->
+					result.put(e.provider(), e.token())
+				);
+
+		return result;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public String generateTokenForInterfaceTranslatorToTargetOperation(
 			final String policy,
 			final String interfaceTranslator,
 			final String targetProvider,
 			final String serviceDefinition,
 			final String operation) {
-		logger.debug("generateTokenForInterfaceTranslator started...");
+		logger.debug("generateTokenForInterfaceTranslatorToTargetOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(policy), "policy is missing");
 		Assert.isTrue(!Utilities.isEmpty(interfaceTranslator), "interfaceTranslator is missing");
 		Assert.isTrue(!Utilities.isEmpty(targetProvider), "targetProvider is missing");
 		Assert.isTrue(!Utilities.isEmpty(serviceDefinition), "serviceDefinition is missing");
 		Assert.isTrue(!Utilities.isEmpty(operation), "operation is missing");
 
-		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayload(policy, interfaceTranslator, targetProvider, serviceDefinition, operation);
+		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayloadForTargetOperation(policy, interfaceTranslator, targetProvider, serviceDefinition, operation);
 
 		final AuthorizationTokenMgmtListResponseDTO response = ahHttpService.consumeService(
 				Constants.SERVICE_DEF_AUTHORIZATION_TOKEN_MANAGEMENT,
@@ -283,13 +313,41 @@ public class CoreSystemsDriver {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private AuthorizationTokenGenerationMgmtListRequestDTO calculateTokenGenerationPayload(
+	private AuthorizationTokenGenerationMgmtListRequestDTO calculateTokenGenerationPayloadForInterfaceBridgeManagementService(final List<ServiceInstanceResponseDTO> interfaceTranslators) {
+		logger.debug("calculateTokenGenerationPayloadForInterfaceBridgeManagementService started...");
+
+		final ZonedDateTime now = Utilities.utcNow();
+
+		final List<AuthorizationTokenGenerationMgmtRequestDTO> list = new ArrayList<>(interfaceTranslators.size());
+
+		interfaceTranslators
+				.forEach(itp -> {
+					final String policy = itp.interfaces().get(0).policy();
+					if (policy.endsWith(Constants.AUTHORIZATION_TOKEN_VARIANT_SUFFIX)) {
+						list.add(new AuthorizationTokenGenerationMgmtRequestDTO(
+								policy,
+								AuthorizationTargetType.SERVICE_DEF.name(),
+								Defaults.DEFAULT_CLOUD,
+								sysInfo.getSystemName(),
+								itp.provider().name(),
+								Constants.SERVICE_DEF_INTERFACE_BRIDGE_MANAGEMENT,
+								null,
+								Utilities.convertZonedDateTimeToUTCString(now.plusHours(tokenIntervalForInterfaceBridgeManagement)),
+								tokenUsageLimitForInterfaceBridgeManagement));
+					}
+				});
+
+		return new AuthorizationTokenGenerationMgmtListRequestDTO(list);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private AuthorizationTokenGenerationMgmtListRequestDTO calculateTokenGenerationPayloadForTargetOperation(
 			final String policy,
 			final String interfaceTranslator,
 			final String targetProvider,
 			final String serviceDefinition,
 			final String operation) {
-		logger.debug("calculateTokenGenerationPayload started...");
+		logger.debug("calculateTokenGenerationPayloadForTargetOperation started...");
 
 		return new AuthorizationTokenGenerationMgmtListRequestDTO(List.of(
 				new AuthorizationTokenGenerationMgmtRequestDTO(
@@ -309,14 +367,10 @@ public class CoreSystemsDriver {
 		logger.debug("calculateInterfaceTranslatorLookupPayload started...");
 
 		final String templateName = sysInfo.isSslEnabled() ? Constants.GENERIC_HTTPS_INTERFACE_TEMPLATE_NAME : Constants.GENERIC_HTTP_INTERFACE_TEMPLATE_NAME;
-		final List<String> policies = AuthenticationPolicy.CERTIFICATE == sysInfo.getAuthenticationPolicy()
-				? List.of(ServiceInterfacePolicy.CERT_AUTH.name(), ServiceInterfacePolicy.NONE.name())
-				: List.of(ServiceInterfacePolicy.NONE.name());
 
 		ServiceInstanceLookupRequestDTO.Builder builder = new ServiceInstanceLookupRequestDTO.Builder()
 				.serviceDefinitionName(Constants.SERVICE_DEF_INTERFACE_BRIDGE_MANAGEMENT)
 				.interfaceTemplateName(templateName)
-				.policies(policies)
 				.metadataRequirementsList(calculateInterfaceTranslatorMetadataRequirements(inputInterfaceRequirements, targets));
 
 		if (translatorServiceMinAvailability > 0) {

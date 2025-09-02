@@ -24,6 +24,11 @@ public final class TranslationManagerConstants {
 	public static final String DATABASE_ENTITY_PACKAGE = "eu.arrowhead.translationmanager.jpa.entity";
 	public static final String DATABASE_REPOSITORY_PACKAGE = "eu.arrowhead.translationmanager.jpa.repository";
 
+	public static final String VERSION_GENERAL_MANAGEMENT = "1.0.0";
+	public static final String VERSION_TRANSLATION_REPORT = "1.0.0";
+	public static final String VERSION_TRANSLATION_BRIDGE = "1.0.0";
+	public static final String VERSION_TRANSLATION_BRIDGE_MANAGEMENT = "1.0.0";
+
 	public static final String HTTP_API_BASE_PATH = "/translation";
 	public static final String HTTP_API_REPORT_PATH = HTTP_API_BASE_PATH + "/report";
 	public static final String HTTP_API_BRIDGE_PATH = HTTP_API_BASE_PATH + "/bridge";

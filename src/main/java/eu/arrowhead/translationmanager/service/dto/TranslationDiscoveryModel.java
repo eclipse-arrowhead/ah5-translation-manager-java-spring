@@ -43,7 +43,9 @@ public class TranslationDiscoveryModel {
 	private String fromInterfaceTemplate;
 	private String toInterfaceTemplate;
 	private String interfaceTranslator;
+	private String interfaceTranslatorPolicy;
 	private Map<String, Object> interfaceTranslatorProperties;
+	private String interfaceTranslatorToken;
 
 	private String inputDataModelTranslator;
 	private boolean inputDataModelTranslatorFactory;
@@ -290,5 +292,25 @@ public class TranslationDiscoveryModel {
 	//-------------------------------------------------------------------------------------------------
 	public void setTargetProperties(final Map<String, Object> targetProperties) {
 		this.targetProperties = targetProperties;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public String getInterfaceTranslatorPolicy() {
+		return interfaceTranslatorPolicy;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public void setInterfaceTranslatorPolicy(final String interfaceTranslatorPolicy) {
+		this.interfaceTranslatorPolicy = interfaceTranslatorPolicy;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public String getInterfaceTranslatorToken() {
+		return interfaceTranslatorToken;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public void setInterfaceTranslatorToken(final String interfaceTranslatorToken) {
+		this.interfaceTranslatorToken = interfaceTranslatorToken;
 	}
 }

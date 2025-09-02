@@ -33,10 +33,13 @@ import eu.arrowhead.common.exception.InvalidParameterException;
 import eu.arrowhead.common.mqtt.MqttStatus;
 import eu.arrowhead.common.mqtt.handler.MqttTopicHandler;
 import eu.arrowhead.common.mqtt.model.MqttRequestModel;
+import eu.arrowhead.dto.TranslationAbortMgmtResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
+import eu.arrowhead.dto.TranslationQueryListResponseDTO;
+import eu.arrowhead.dto.TranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.TranslationManagerConstants;
 import eu.arrowhead.translationmanager.service.TranslationBridgeManagementService;
 
@@ -87,6 +90,11 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 			responsePayload = abort(ids);
 			break;
 
+		case Constants.SERVICE_OP_QUERY:
+			final TranslationQueryRequestDTO queryDTO = readPayload(request.getPayload(), TranslationQueryRequestDTO.class);
+			responsePayload = query(queryDTO);
+			break;
+
 		default:
 			throw new InvalidParameterException("Unknown operation: " + request.getOperation());
 		}
@@ -112,9 +120,17 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	private Object abort(final List<String> ids) {
+	private TranslationAbortMgmtResponseDTO abort(final List<String> ids) {
 		logger.debug("TranslationBridgeManagementMqttHandler.abort started");
 
 		return mgmtService.abortOperation(ids, baseTopic() + Constants.SERVICE_OP_ABORT);
 	}
+
+	//-------------------------------------------------------------------------------------------------
+	private TranslationQueryListResponseDTO query(final TranslationQueryRequestDTO queryDTO) {
+		logger.debug("TranslationBridgeManagementMqttHandler.query started");
+
+		return mgmtService.queryOperation(queryDTO, baseTopic() + Constants.SERVICE_OP_QUERY);
+	}
+
 }

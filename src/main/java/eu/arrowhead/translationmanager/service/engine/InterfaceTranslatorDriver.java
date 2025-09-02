@@ -16,6 +16,7 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service.engine;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.util.Pair;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -71,6 +73,7 @@ public class InterfaceTranslatorDriver {
 	@SuppressWarnings("unchecked")
 	public List<NormalizedServiceInstanceDTO> filterOutNotAppropriateTargetsForInterfaceTranslator(
 			final ServiceInstanceResponseDTO interfaceTranslator,
+			final String token,
 			final String targetOperation,
 			final List<NormalizedServiceInstanceDTO> targets) {
 		logger.debug("filterOutNotAppropriateTargetsForInterfaceTranslator started...");
@@ -101,13 +104,20 @@ public class InterfaceTranslatorDriver {
 
 		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath);
 		final TranslationCheckTargetsRequestDTO payload = calculateCheckTargetsPayload(targetOperation, targets);
+		final Map<String, String> headers = new HashMap<>(1);
+
+		if (!Utilities.isEmpty(token)) {
+			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + token);
+		}
 
 		try {
 			final TranslationCheckTargetsResponseDTO response = httpService.sendRequest(
 					uri,
 					method,
 					TranslationCheckTargetsResponseDTO.class,
-					payload);
+					payload,
+					null,
+					headers);
 
 			return getCheckedTargetsFromResponse(response);
 		} catch (final ArrowheadException ex) {
@@ -121,8 +131,9 @@ public class InterfaceTranslatorDriver {
 	public Pair<Optional<ServiceInstanceInterfaceResponseDTO>, Optional<ArrowheadException>> initializeBridge(
 			final UUID bridgeId,
 			final TranslationDiscoveryModel model,
-			final String token,
+			final String targetToken,
 			final Map<String, Object> interfaceTranslatorSettings,
+			final String interfaceTranslatorToken,
 			final Map<String, Object> inputDataModelTranslatorSettings,
 			final Map<String, Object> outputDataModelTranslatorSettings) {
 		logger.debug("initializeBridge started...");
@@ -153,17 +164,24 @@ public class InterfaceTranslatorDriver {
 		final TranslationBridgeInitializationRequestDTO payload = calculateBridgeInitializationPayload(
 				bridgeId,
 				model,
-				token,
+				targetToken,
 				interfaceTranslatorSettings,
 				inputDataModelTranslatorSettings,
 				outputDataModelTranslatorSettings);
+		final Map<String, String> headers = new HashMap<>(1);
+
+		if (!Utilities.isEmpty(interfaceTranslatorToken)) {
+			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + interfaceTranslatorToken);
+		}
 
 		try {
 			final ServiceInstanceInterfaceResponseDTO response = httpService.sendRequest(
 					uri,
 					method,
 					ServiceInstanceInterfaceResponseDTO.class,
-					payload);
+					payload,
+					null,
+					headers);
 
 			return Pair.of(Optional.of(response), Optional.empty());
 		} catch (final ArrowheadException ex) {
@@ -174,7 +192,7 @@ public class InterfaceTranslatorDriver {
 
 	//-------------------------------------------------------------------------------------------------
 	@SuppressWarnings("unchecked")
-	public void abortBridge(final UUID bridgeId, final Map<String, Object> interfaceProperties) {
+	public void abortBridge(final UUID bridgeId, final Map<String, Object> interfaceProperties, final String interfaceTranslatorToken) {
 		logger.debug("abortBridge started...");
 		Assert.notNull(bridgeId, "bridgeId is missing");
 		Assert.isTrue(!Utilities.isEmpty(interfaceProperties), "interfaceProperties is missing");
@@ -199,11 +217,17 @@ public class InterfaceTranslatorDriver {
 		}
 
 		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath + "/" + bridgeId.toString());
+		final Map<String, String> headers = new HashMap<>(1);
+
+		if (!Utilities.isEmpty(interfaceTranslatorToken)) {
+			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + interfaceTranslatorToken);
+		}
 
 		try {
 			httpService.sendRequest(
 					uri,
 					method,
+					headers,
 					Void.TYPE);
 		} catch (final ArrowheadException ex) {
 			// some error happens during bridge abortion, cannot do anything

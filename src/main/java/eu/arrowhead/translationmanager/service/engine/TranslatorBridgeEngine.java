@@ -132,15 +132,19 @@ public class TranslatorBridgeEngine {
 				return new TranslationDiscoveryResponseDTO(null, List.of());
 			}
 
+			// create tokens (if necessary) for using interface translator's translationBridgeManagement service
+			final Map<String, String> tokens = csDriver.generateTokenForManagerToInterfaceBridgeManagementService(appropriateInterfaceTranslatorCandidates);
+
 			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains a interface translator and a list of target interfaces that have
 			// every information to make possible to communicate with by the interface translator
 			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateInterfaceTranslators = calculateInterfaceTranslatorMap(
 					appropriateInterfaceTranslatorCandidates,
+					tokens,
 					dto.operation(),
 					candidates);
 
 			// creating initial discovery models
-			List<TranslationDiscoveryModel> models = createDiscoveryModels(dto, candidates, candidatesWithAppropriateInterfaceTranslators);
+			List<TranslationDiscoveryModel> models = createDiscoveryModels(dto, candidates, candidatesWithAppropriateInterfaceTranslators, tokens);
 			if (models.isEmpty()) {
 				return new TranslationDiscoveryResponseDTO(null, List.of());
 			}
@@ -196,6 +200,7 @@ public class TranslatorBridgeEngine {
 			detailsRecord.setInterfaceTranslatorData(Utilities.toJson(new TranslationInterfaceTranslationDataDescriptorDTO(
 					model.getFromInterfaceTemplate(),
 					model.getToInterfaceTemplate(),
+					model.getInterfaceTranslatorToken(),
 					model.getInterfaceTranslatorProperties(),
 					interfaceTranslatorSettings)));
 
@@ -217,10 +222,10 @@ public class TranslatorBridgeEngine {
 				throw new InvalidParameterException("Bridge is already in an end state");
 			}
 
-			// token handling
+			// token handling (for target)
 			String token = null;
 			if (model.getTargetPolicy().endsWith(Constants.AUTHORIZATION_TOKEN_VARIANT_SUFFIX)) {
-				token = csDriver.generateTokenForInterfaceTranslator(
+				token = csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
 						model.getTargetPolicy(),
 						model.getInterfaceTranslator(),
 						ServiceInstanceIdUtils.retrieveSystemNameFromInstanceId(model.getTargetInstanceId()),
@@ -233,6 +238,7 @@ public class TranslatorBridgeEngine {
 					model,
 					token,
 					interfaceTranslatorSettings,
+					model.getInterfaceTranslatorToken(),
 					inputTranslatorSettings,
 					outputTranslatorSettings);
 
@@ -240,7 +246,7 @@ public class TranslatorBridgeEngine {
 				// success
 				isBridgeInEndState = dbService.bridgeInitialized(detailsRecord.getHeader());
 				if (isBridgeInEndState) {
-					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties());
+					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties(), model.getInterfaceTranslatorToken());
 
 					throw new InvalidParameterException("Bridge is already in an end state");
 				}
@@ -293,7 +299,7 @@ public class TranslatorBridgeEngine {
 						final TranslationInterfaceTranslationDataDescriptorDTO interfaceTranslationData = Utilities.fromJson(
 								dbResult.detailsRecord().getInterfaceTranslatorData(),
 								TranslationInterfaceTranslationDataDescriptorDTO.class);
-						itDriver.abortBridge(id, interfaceTranslationData.interfaceProperties());
+						itDriver.abortBridge(id, interfaceTranslationData.interfaceProperties(), interfaceTranslationData.token());
 					}
 				} else {
 					if (dbResult.fromStatus() == null) {
@@ -524,6 +530,7 @@ public class TranslatorBridgeEngine {
 	@SuppressWarnings("unchecked")
 	private Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> calculateInterfaceTranslatorMap(
 			final List<ServiceInstanceResponseDTO> interfaceTranslators,
+			final Map<String, String> tokens,
 			final String targetOperation,
 			final List<NormalizedServiceInstanceDTO> targets) {
 		logger.debug("calculateInterfaceTranslatorMap started...");
@@ -543,7 +550,7 @@ public class TranslatorBridgeEngine {
 							.contains(toInterface))
 					.toList();
 
-			relatedTargets = itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(itp, targetOperation, relatedTargets);
+			relatedTargets = itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(itp, tokens.get(itp.provider().name()), targetOperation, relatedTargets);
 			relatedTargets.forEach(t -> {
 				if (!result.containsKey(t.instanceId())) {
 					result.put(t.instanceId(), new ArrayList<>());
@@ -567,7 +574,8 @@ public class TranslatorBridgeEngine {
 	private List<TranslationDiscoveryModel> createDiscoveryModels(
 			final NormalizedTranslationDiscoveryRequestDTO dto,
 			final List<NormalizedServiceInstanceDTO> candidates,
-			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateTranslators) {
+			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateTranslators,
+			final Map<String, String> tokens) {
 		logger.debug("createDiscoveryModels started...");
 
 		final List<TranslationDiscoveryModel> models = new ArrayList<>(candidates.size());
@@ -586,7 +594,10 @@ public class TranslatorBridgeEngine {
 						dto.outputDataModelId());
 				model.setFromInterfaceTemplate(selected.getSecond());
 				model.setInterfaceTranslator(selected.getFirst().provider().name());
-				model.setInterfaceTranslatorProperties(selected.getFirst().interfaces().get(0).properties());
+				final ServiceInstanceInterfaceResponseDTO interfaceDTO = selected.getFirst().interfaces().get(0);
+				model.setInterfaceTranslatorPolicy(interfaceDTO.policy());
+				model.setInterfaceTranslatorToken(tokens.get(model.getInterfaceTranslator()));
+				model.setInterfaceTranslatorProperties(interfaceDTO.properties());
 				model.setToInterfaceTemplate(((Map) model.getInterfaceTranslatorProperties().get(Constants.METADATA_KEY_INTERFACE_BRIDGE)).get(Constants.METADATA_KEY_TO).toString());
 
 				final ServiceInstanceInterfaceResponseDTO selectedTargetInterface = c.interfaces()
