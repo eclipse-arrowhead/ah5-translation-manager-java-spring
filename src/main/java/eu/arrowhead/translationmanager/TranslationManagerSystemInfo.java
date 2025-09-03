@@ -159,7 +159,9 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 						Constants.NORMALIZATION_MODE,
 						TranslationManagerConstants.ENABLE_AUTHORIZATION,
 						TranslationManagerConstants.TRANSLATOR_SERVICE_MIN_AVAILABILITY,
-						TranslationManagerConstants.ENABLE_CUSTOM_CONFIGURATION),
+						TranslationManagerConstants.ENABLE_CUSTOM_CONFIGURATION,
+						TranslationManagerConstants.TRANSLATION_DISCOVERY_MAX_AGE,
+						TranslationManagerConstants.CLEANER_JOB_INTERVAL),
 				TranslationManagerDefaults.class);
 	}
 

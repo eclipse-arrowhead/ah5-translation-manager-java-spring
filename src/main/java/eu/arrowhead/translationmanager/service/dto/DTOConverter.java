@@ -68,24 +68,24 @@ public class DTOConverter {
 		final List<TranslationQueryResponseDTO> result = page
 				.stream()
 				.map(e -> new TranslationQueryResponseDTO(
-						e.getHeader().getUuid(),
-						e.getHeader().getStatus().name(),
-						e.getHeader().getUsageReportCount(),
-						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getAliveAt()),
-						e.getHeader().getMessage(),
-						e.getConsumer(),
-						e.getProvider(),
-						e.getServiceDefinition(),
-						e.getOperation(),
-						e.getInterfaceTranslator(),
-						Utilities.fromJson(e.getInterfaceTranslatorData(), TranslationInterfaceTranslationDataDescriptorDTO.class),
-						e.getInputDmTranslator(),
-						Utilities.fromJson(e.getInputDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
-						e.getResultDmTranslator(),
-						Utilities.fromJson(e.getResultDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
-						e.getHeader().getCreatedBy(),
-						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getCreatedAt()),
-						Utilities.convertZonedDateTimeToUTCString(e.getHeader().getUpdatedAt())))
+							e.getHeader().getUuid(),
+							e.getHeader().getStatus().name(),
+							e.getHeader().getUsageReportCount(),
+							Utilities.convertZonedDateTimeToUTCString(e.getHeader().getAliveAt()),
+							e.getHeader().getMessage(),
+							e.getConsumer(),
+							e.getProvider(),
+							e.getServiceDefinition(),
+							e.getOperation(),
+							e.getInterfaceTranslator(),
+							Utilities.fromJson(e.getInterfaceTranslatorData(), TranslationInterfaceTranslationDataDescriptorDTO.class),
+							e.getInputDmTranslator(),
+							Utilities.fromJson(e.getInputDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
+							e.getResultDmTranslator(),
+							Utilities.fromJson(e.getResultDmTranslatorData(), TranslationDataModelTranslationDataDescriptorDTO.class),
+							e.getHeader().getCreatedBy(),
+							Utilities.convertZonedDateTimeToUTCString(e.getHeader().getCreatedAt()),
+							Utilities.convertZonedDateTimeToUTCString(e.getHeader().getUpdatedAt())))
 				.toList();
 
 		return new TranslationQueryListResponseDTO(result, page.getTotalElements());

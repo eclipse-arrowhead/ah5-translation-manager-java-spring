@@ -62,10 +62,10 @@ public class TranslationBridgeManagementService {
 
 	@Autowired
 	private TranslatorBridgeEngine engine;
-	
+
 	@Autowired
 	private BridgeDbService dbService;
-	
+
 	@Autowired
 	private DTOConverter converter;
 
@@ -96,7 +96,7 @@ public class TranslationBridgeManagementService {
 
 	//-------------------------------------------------------------------------------------------------
 	public TranslationAbortMgmtResponseDTO abortOperation(final List<String> ids, final String origin) {
-		logger.debug("negotiationOperation started...");
+		logger.debug("abortOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		final List<UUID> normalized = validator.validateAndNormalizeAbortMgmtRequest(ids, origin);
@@ -112,7 +112,7 @@ public class TranslationBridgeManagementService {
 
 		final NormalizedTranslationQueryRequestDTO normalized = validator.validateAndNormalizedQueryMgmtRequest(dto, origin);
 		final Page<BridgeDetails> page = dbService.getBridgeDetailsPage(normalized);
-		
+
 		return converter.convertBridgeDetailsPage(page);
 	}
 

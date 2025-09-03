@@ -60,7 +60,7 @@ public class TranslationReportAPI {
 	// methods
 
 	//-------------------------------------------------------------------------------------------------
-	@Operation(summary = "Reports a translation bridge related event.")
+	@Operation(summary = "Reports a translation bridge related event")
 	@ApiResponses(value = {
 			@ApiResponse(responseCode = Constants.HTTP_STATUS_OK, description = Constants.SWAGGER_HTTP_200_MESSAGE),
 			@ApiResponse(responseCode = Constants.HTTP_STATUS_BAD_REQUEST, description = Constants.SWAGGER_HTTP_400_MESSAGE, content = {

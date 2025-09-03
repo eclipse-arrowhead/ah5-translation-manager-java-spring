@@ -119,7 +119,7 @@ public class TranslationBridgeManagementAPI {
 	public @ResponseBody TranslationNegotiationResponseDTO negotiation(@RequestBody final TranslationNegotiationMgmtRequestDTO dto) {
 		logger.debug("negotiation started...");
 
-		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_PATH + TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH;
+		final String origin = HttpMethod.POST.name() + " " + TranslationManagerConstants.HTTP_API_BRIDGE_MANAGEMENT_PATH + TranslationManagerConstants.HTTP_API_OP_NEGOTIATION_PATH;
 
 		return mgmtService.negotiationOperation(dto, origin);
 	}

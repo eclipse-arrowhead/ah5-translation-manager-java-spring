@@ -105,7 +105,6 @@ public class InterfaceTranslatorDriver {
 		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath);
 		final TranslationCheckTargetsRequestDTO payload = calculateCheckTargetsPayload(targetOperation, targets);
 		final Map<String, String> headers = new HashMap<>(1);
-
 		if (!Utilities.isEmpty(token)) {
 			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + token);
 		}
@@ -121,7 +120,7 @@ public class InterfaceTranslatorDriver {
 
 			return getCheckedTargetsFromResponse(response);
 		} catch (final ArrowheadException ex) {
-			// can't use the interface translator instance => removing it from candidates by returning empty target list
+			// can't use this interface translator instance => removing it from candidates by returning empty target list
 			return List.of();
 		}
 	}
@@ -149,8 +148,8 @@ public class InterfaceTranslatorDriver {
 		final String basePath = interfaceProperties.get(HttpInterfaceModel.PROP_NAME_BASE_PATH).toString();
 		if (interfaceProperties.containsKey(HttpInterfaceModel.PROP_NAME_OPERATIONS)
 				&& (interfaceProperties.get(HttpInterfaceModel.PROP_NAME_OPERATIONS) instanceof final Map operationsMap)
-				&& operationsMap.containsKey(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_CHECK_TARGETS)) {
-			final Object value = operationsMap.get(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_CHECK_TARGETS);
+				&& operationsMap.containsKey(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_INIT_BRIDGE)) {
+			final Object value = operationsMap.get(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_INIT_BRIDGE);
 			try {
 				final HttpOperationModel operationModel = Utilities.fromJson(Utilities.toJson(value), HttpOperationModel.class);
 				method = HttpMethod.valueOf(operationModel.method());
@@ -169,7 +168,6 @@ public class InterfaceTranslatorDriver {
 				inputDataModelTranslatorSettings,
 				outputDataModelTranslatorSettings);
 		final Map<String, String> headers = new HashMap<>(1);
-
 		if (!Utilities.isEmpty(interfaceTranslatorToken)) {
 			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + interfaceTranslatorToken);
 		}
@@ -205,8 +203,8 @@ public class InterfaceTranslatorDriver {
 		final String basePath = interfaceProperties.get(HttpInterfaceModel.PROP_NAME_BASE_PATH).toString();
 		if (interfaceProperties.containsKey(HttpInterfaceModel.PROP_NAME_OPERATIONS)
 				&& (interfaceProperties.get(HttpInterfaceModel.PROP_NAME_OPERATIONS) instanceof final Map operationsMap)
-				&& operationsMap.containsKey(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_CHECK_TARGETS)) {
-			final Object value = operationsMap.get(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_CHECK_TARGETS);
+				&& operationsMap.containsKey(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_ABORT_BRIDGE)) {
+			final Object value = operationsMap.get(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_ABORT_BRIDGE);
 			try {
 				final HttpOperationModel operationModel = Utilities.fromJson(Utilities.toJson(value), HttpOperationModel.class);
 				method = HttpMethod.valueOf(operationModel.method());
@@ -218,7 +216,6 @@ public class InterfaceTranslatorDriver {
 
 		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath + "/" + bridgeId.toString());
 		final Map<String, String> headers = new HashMap<>(1);
-
 		if (!Utilities.isEmpty(interfaceTranslatorToken)) {
 			headers.put(HttpHeaders.AUTHORIZATION, Constants.AUTHORIZATION_SCHEMA + " " + interfaceTranslatorToken);
 		}
@@ -244,9 +241,9 @@ public class InterfaceTranslatorDriver {
 		return new TranslationCheckTargetsRequestDTO(
 				targetOperation,
 				targets
-						.stream()
-						.map(t -> new TranslationTargetDTO(t.instanceId(), t.interfaces()))
-						.toList());
+					.stream()
+					.map(t -> new TranslationTargetDTO(t.instanceId(), t.interfaces()))
+					.toList());
 	}
 
 	//-------------------------------------------------------------------------------------------------

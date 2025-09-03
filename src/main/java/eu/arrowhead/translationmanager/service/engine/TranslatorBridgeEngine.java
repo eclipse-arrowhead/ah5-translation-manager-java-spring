@@ -136,7 +136,7 @@ public class TranslatorBridgeEngine {
 			final Map<String, String> tokens = csDriver.generateTokenForManagerToInterfaceBridgeManagementService(appropriateInterfaceTranslatorCandidates);
 
 			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains a interface translator and a list of target interfaces that have
-			// every information to make possible to communicate with by the interface translator
+			// every information to make possible to communicate with the target by the interface translator
 			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateInterfaceTranslators = calculateInterfaceTranslatorMap(
 					appropriateInterfaceTranslatorCandidates,
 					tokens,
@@ -222,7 +222,7 @@ public class TranslatorBridgeEngine {
 				throw new InvalidParameterException("Bridge is already in an end state");
 			}
 
-			// token handling (for target)
+			// token handling for target
 			String token = null;
 			if (model.getTargetPolicy().endsWith(Constants.AUTHORIZATION_TOKEN_VARIANT_SUFFIX)) {
 				token = csDriver.generateTokenForInterfaceTranslatorToTargetOperation(

@@ -70,18 +70,18 @@ public class CoreSystemsDriver {
 	// members
 
 	private static final int tokenIntervalForInterfaceBridgeManagement = 24; // in hours
-	private static final int tokenUsageLimitForInterfaceBridgeManagement = 100; // in hours
+	private static final int tokenUsageLimitForInterfaceBridgeManagement = 100;
 
 	@Value(TranslationManagerConstants.$TRANSLATOR_SERVICE_MIN_AVAILABILITY_WD)
 	private int translatorServiceMinAvailability;
-
-	private final Logger logger = LogManager.getLogger(this.getClass());
 
 	@Autowired
 	private TranslationManagerSystemInfo sysInfo;
 
 	@Autowired
 	private ArrowheadHttpService ahHttpService;
+
+	private final Logger logger = LogManager.getLogger(this.getClass());
 
 	//=================================================================================================
 	// methods
@@ -100,7 +100,10 @@ public class CoreSystemsDriver {
 		Assert.isTrue(!Utilities.isEmpty(systemNames), "systemNames is missing");
 		Assert.isTrue(!Utilities.containsNullOrEmpty(systemNames), "systemNames list contains null or empty element");
 
-		final List<String> candidates = systemNames.stream().filter(sysName -> !sysInfo.getBlacklistCheckExcludeList().contains(sysName)).toList();
+		final List<String> candidates = systemNames
+				.stream()
+				.filter(sysName -> !sysInfo.getBlacklistCheckExcludeList().contains(sysName))
+				.toList();
 
 		try {
 			boolean hasMorePage = false;
@@ -148,10 +151,10 @@ public class CoreSystemsDriver {
 		} catch (final ArrowheadException ex) {
 			logger.error("Blacklist server is not available during the translation bridge process");
 			if (sysInfo.isBlacklistForced()) {
-				logger.error("All the provider candidate has been filtered out, because blacklist is forced");
+				logger.error("All the systems have been filtered out, because blacklist is forced");
 				return List.of();
 			} else {
-				logger.error("All the provider candidate has been passed, because blacklist filter is not forced");
+				logger.error("All the systems have been passed, because blacklist is not forced");
 				return systemNames;
 			}
 		}
@@ -161,6 +164,7 @@ public class CoreSystemsDriver {
 	public List<String> filterOutProvidersBecauseOfUnauthorization(final List<String> candidates, final String consumer, final String serviceDefinition, final String operation) {
 		logger.debug("filterOutProvidersBecauseOfUnauthorization started...");
 		Assert.isTrue(!Utilities.isEmpty(candidates), "candidates list is missing");
+		Assert.isTrue(!Utilities.containsNullOrEmpty(candidates), "candidates list contains null or empty value");
 		Assert.isTrue(!Utilities.isEmpty(consumer), "consumer is missing");
 		Assert.isTrue(!Utilities.isEmpty(serviceDefinition), "serviceDefinition is missing");
 
@@ -196,10 +200,9 @@ public class CoreSystemsDriver {
 	public Map<String, String> generateTokenForManagerToInterfaceBridgeManagementService(final List<ServiceInstanceResponseDTO> interfaceTranslators) {
 		logger.debug("generateTokenForManagerToInterfaceBridgeManagementService started...");
 		Assert.isTrue(!Utilities.isEmpty(interfaceTranslators), "interfaceTranslators list is missing");
-		Assert.isTrue(!Utilities.containsNull(interfaceTranslators), "interfaceTranslators list contains null value");
+		Assert.isTrue(!Utilities.containsNull(interfaceTranslators), "interfaceTranslators list contains null element");
 
 		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayloadForInterfaceBridgeManagementService(interfaceTranslators);
-
 		final AuthorizationTokenMgmtListResponseDTO response = ahHttpService.consumeService(
 				Constants.SERVICE_DEF_AUTHORIZATION_TOKEN_MANAGEMENT,
 				Constants.SERVICE_OP_AUTHORIZATION_GENERATE_TOKENS,
@@ -209,11 +212,8 @@ public class CoreSystemsDriver {
 				new LinkedMultiValueMap<>(Map.of(Constants.UNBOUND, List.of(Boolean.TRUE.toString()))));
 
 		final Map<String, String> result = new HashMap<>(response.entries().size());
-
 		response.entries()
-				.forEach(e ->
-					result.put(e.provider(), e.token())
-				);
+				.forEach(e -> result.put(e.provider(), e.token()));
 
 		return result;
 	}
@@ -233,7 +233,6 @@ public class CoreSystemsDriver {
 		Assert.isTrue(!Utilities.isEmpty(operation), "operation is missing");
 
 		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayloadForTargetOperation(policy, interfaceTranslator, targetProvider, serviceDefinition, operation);
-
 		final AuthorizationTokenMgmtListResponseDTO response = ahHttpService.consumeService(
 				Constants.SERVICE_DEF_AUTHORIZATION_TOKEN_MANAGEMENT,
 				Constants.SERVICE_OP_AUTHORIZATION_GENERATE_TOKENS,
@@ -252,7 +251,9 @@ public class CoreSystemsDriver {
 	public List<ServiceInstanceResponseDTO> collectInterfaceTranslatorCandidates(final List<String> inputInterfaceRequirements, final List<NormalizedServiceInstanceDTO> targets) {
 		logger.debug("collectInterfaceTranslatorCandidates started...");
 		Assert.isTrue(!Utilities.isEmpty(inputInterfaceRequirements), "inputInterfaceRequirements list is missing");
+		Assert.isTrue(!Utilities.containsNullOrEmpty(inputInterfaceRequirements), "inputInterfaceRequirements list contains null or empty element");
 		Assert.isTrue(!Utilities.isEmpty(targets), "targets list is missing");
+		Assert.isTrue(!Utilities.containsNull(null), "targets list contains null element");
 
 		final ServiceInstanceLookupRequestDTO payload = calculateInterfaceTranslatorLookupPayload(inputInterfaceRequirements, targets);
 		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
@@ -269,6 +270,7 @@ public class CoreSystemsDriver {
 	public List<ServiceInstanceResponseDTO> collectDataModelTranslatorCandidates(final List<TranslationDiscoveryModel> models) {
 		logger.debug("collectDataModelTranslatorCandidates started...");
 		Assert.isTrue(!Utilities.isEmpty(models), "models list is missing");
+		Assert.isTrue(!Utilities.containsNull(models), "models list contains null element");
 
 		final ServiceInstanceLookupRequestDTO payload = calculateDataModelTranslatorLookupPayload(models);
 		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
@@ -386,7 +388,6 @@ public class CoreSystemsDriver {
 		logger.debug("calculateInterfaceTranslatorMetadataRequirements started...");
 
 		final Set<MetadataRequirementDTO> resultSet = new HashSet<>();
-
 		targets.forEach(t -> {
 			final MetadataRequirementDTO req = new MetadataRequirementDTO();
 			req.put(String.join(Constants.DOT, Constants.METADATA_KEY_INTERFACE_BRIDGE, Constants.METADATA_KEY_FROM), Map.of(
@@ -432,7 +433,6 @@ public class CoreSystemsDriver {
 		logger.debug("calculateDataModelTranslatorInterfacePropertyRequirements started...");
 
 		final Set<MetadataRequirementDTO> resultSet = new HashSet<>();
-
 		models.forEach(m -> {
 			if (m.getInputDataModelIdRequirement() != null) {
 				final MetadataRequirementDTO req = new MetadataRequirementDTO();

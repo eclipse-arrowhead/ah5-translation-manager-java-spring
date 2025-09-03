@@ -44,9 +44,9 @@ public class DataModelTranslatorFactoryDriver {
 			final String fromDataModelId,
 			final String toDataModelId) {
 		logger.debug("initializeDataModelTranslator started...");
-		Assert.isTrue(!Utilities.isEmpty(factoryInterfaceProperties), "factory interface properties is missing");
-		Assert.isTrue(!Utilities.isEmpty(fromDataModelId), "from data model identifier is missing");
-		Assert.isTrue(!Utilities.isEmpty(toDataModelId), "to data model identifier is missing");
+		Assert.isTrue(!Utilities.isEmpty(factoryInterfaceProperties), "Factory interface properties is missing");
+		Assert.isTrue(!Utilities.isEmpty(fromDataModelId), "From data model identifier is missing");
+		Assert.isTrue(!Utilities.isEmpty(toDataModelId), "To data model identifier is missing");
 
 		// TODO: implement to support data model translator factories
 

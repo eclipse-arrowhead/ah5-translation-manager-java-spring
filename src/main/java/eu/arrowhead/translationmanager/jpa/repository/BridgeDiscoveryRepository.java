@@ -16,6 +16,7 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.jpa.repository;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Repository;
@@ -35,4 +36,8 @@ public interface BridgeDiscoveryRepository extends RefreshableRepository<BridgeD
 
 	//-------------------------------------------------------------------------------------------------
 	public void deleteByHeader(final BridgeHeader header);
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MethodNameCheck")
+	public List<BridgeDiscovery> findByHeader_CreatedAtLessThan(final ZonedDateTime time);
 }

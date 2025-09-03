@@ -16,6 +16,7 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.jpa.service;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -128,6 +129,7 @@ public class BridgeDbService {
 	public Pair<BridgeHeader, List<BridgeDiscovery>> storeBridgeDiscoveries(final UUID bridgeId, final String createdBy, final List<TranslationDiscoveryModel> models) {
 		logger.debug("storeBridgeDiscoveries started...");
 		Assert.notNull(bridgeId, "bridgeId is null");
+		Assert.isTrue(!Utilities.isEmpty(createdBy), "createdBy is missing");
 		Assert.isTrue(!Utilities.isEmpty(models), "models list is missing");
 		Assert.isTrue(!Utilities.containsNull(models), "models list contains null element");
 
@@ -159,25 +161,25 @@ public class BridgeDbService {
 	public Pair<TranslationDiscoveryModel, BridgeDetails> selectBridgeFromDiscoveries(final UUID bridgeId, final String instanceId) {
 		logger.debug("selectBridgeFromDiscoveries started...");
 		Assert.notNull(bridgeId, "bridgeId is null");
-		Assert.isTrue(!Utilities.isEmpty(instanceId), "instance id is missing");
+		Assert.isTrue(!Utilities.isEmpty(instanceId), "instanceId is missing");
 
 		try {
 			// finding related header
 			final Optional<BridgeHeader> headerOpt = headerRepository.findByUuid(bridgeId.toString());
 			if (headerOpt.isEmpty()) {
-				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId);
+				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId.toString());
 			}
 
 			BridgeHeader header = headerOpt.get();
 			if (!TranslationBridgeStatus.isValidTransition(header.getStatus(), TranslationBridgeStatus.PENDING)) {
-				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId);
+				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId.toString());
 			}
 
 			// finding related discovery model
 			final List<BridgeDiscovery> discoveries = discoveryRepository.findByHeader(header);
 			final Optional<TranslationDiscoveryModel> modelOpt = findDiscoveryModelByInstanceId(discoveries, instanceId);
 			if (modelOpt.isEmpty()) {
-				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId);
+				throw new InvalidParameterException("Invalid bridge identifier: " + bridgeId.toString());
 			}
 
 			synchronized (LOCK) {
@@ -314,7 +316,7 @@ public class BridgeDbService {
 			}
 
 			final TranslationBridgeStatus oldStatus = header.getStatus();
-			if (TranslationBridgeStatus.isValidTransition(header.getStatus(), TranslationBridgeStatus.ABORTED)) {
+			if (TranslationBridgeStatus.isValidTransition(oldStatus, TranslationBridgeStatus.ABORTED)) {
 				// delete related discovery records (if any)
 				discoveryRepository.deleteByHeader(header);
 
@@ -341,7 +343,7 @@ public class BridgeDbService {
 
 	//-------------------------------------------------------------------------------------------------
 	public Page<BridgeDetails> getBridgeDetailsPage(final NormalizedTranslationQueryRequestDTO dto) {
-		logger.debug("getBridgeDetails started...");
+		logger.debug("getBridgeDetailsPage started...");
 		Assert.notNull(dto, "dto is missing");
 
 		try {
@@ -356,6 +358,46 @@ public class BridgeDbService {
 			throw new InternalServerError("Database operation error");
 		}
 
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public List<BridgeDiscovery> getBridgeDiscoveriesCreatedBefore(final ZonedDateTime threshold) {
+		logger.debug("getBridgeDiscoveriesCreatedBefore started...");
+		Assert.notNull(threshold, "threshold is missing");
+
+		try {
+			return discoveryRepository.findByHeader_CreatedAtLessThan(threshold);
+		} catch (final Exception ex) {
+			logger.error(ex.getMessage());
+			logger.debug(ex);
+			throw new InternalServerError("Database operation error");
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Transactional(rollbackFor = ArrowheadException.class)
+	public void handleObsoletedBridgeDiscovery(final BridgeDiscovery record) {
+		logger.debug("handleObsoletedBridgeDiscovery started...");
+		Assert.notNull(record, "record is missing");
+
+		try {
+			synchronized (LOCK) {
+				final BridgeHeader header = record.getHeader();
+				final TranslationBridgeStatus status = header.getStatus();
+				if (!status.isEndStatus() && !status.isActiveStatus()) {
+					header.setStatus(TranslationBridgeStatus.CLOSED);
+					header.setMessage("Closed by TranslationManager because of inactivity");
+					headerRepository.saveAndFlush(header);
+				}
+			}
+
+			discoveryRepository.delete(record);
+			discoveryRepository.flush();
+		} catch (final Exception ex) {
+			logger.error(ex.getMessage());
+			logger.debug(ex);
+			throw new InternalServerError("Database operation error");
+		}
 	}
 
 	//=================================================================================================
@@ -399,6 +441,7 @@ public class BridgeDbService {
 				baseFilter = BaseFilter.SERVICE_DEF;
 			} else if (!Utilities.isEmpty(dto.interfaceTranslators())) {
 				toFilter = detailsRepository.findByInterfaceTranslatorIn(dto.interfaceTranslators());
+				baseFilter = BaseFilter.INTERFACE_TRANSLATOR;
 			} else if (!Utilities.isEmpty(dto.statuses())) {
 				toFilter = detailsRepository.findByHeader_StatusIn(dto.statuses());
 				baseFilter = BaseFilter.STATUS;
@@ -411,7 +454,7 @@ public class BridgeDbService {
 
 			final Set<Long> matchingIds = new HashSet<>();
 			for (final BridgeDetails record : toFilter) {
-				// Match against bridge ids is not needed since if bridge ids is defined then the toFilter list only contains matching records
+				// Match against bridge ids is not needed since if bridge ids are defined then the toFilter list only contains matching records
 
 				// Match against consumers
 				if (baseFilter != BaseFilter.CONSUMER && !Utilities.isEmpty(dto.consumers()) && !dto.consumers().contains(record.getConsumer())) {

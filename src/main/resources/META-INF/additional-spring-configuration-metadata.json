@@ -108,5 +108,15 @@
     "name": "enable.custom.configuration",
     "type": "java.lang.Boolean",
     "description": "A description for 'enable.custom.configuration'"
+  },
+  {
+    "name": "translation.discovery.max.age",
+    "type": "java.lang.Integer",
+    "description": "A description for 'translation.discovery.max.age'"
+  },
+  {
+    "name": "cleaner.job.interval",
+    "type": "java.lang.Long",
+    "description": "A description for 'cleaner.job.interval'"
   }
 ]}

@@ -26,6 +26,8 @@ public final class TranslationManagerDefaults extends Defaults {
 	public static final String ENABLE_AUTHORIZATION_DEFAULT = "false";
 	public static final String TRANSLATOR_SERVICE_MIN_AVAILABILITY_DEFAULT = "5";
 	public static final String ENABLE_CUSTOM_CONFIGURATION_DEFAULT = "false";
+	public static final String TRANSLATION_DISCOVERY_MAX_AGE_DEFAULT = "8";
+	public static final String CLEANER_JOB_INTERVAL_DEFAULT = "60000";
 
 	//=================================================================================================
 	// assistant methods

@@ -70,7 +70,7 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 		logger.debug("TranslationBridgeManagementMqttHandler.handle started");
 		Assert.isTrue(request.getBaseTopic().equals(baseTopic()), "MQTT topic-handler mismatch");
 
-		final MqttStatus responseStatus = MqttStatus.OK;
+		MqttStatus responseStatus = MqttStatus.OK;
 		Object responsePayload = null;
 
 		switch (request.getOperation()) {
@@ -81,6 +81,7 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 
 		case Constants.SERVICE_OP_NEGOTIATION:
 			final TranslationNegotiationMgmtRequestDTO negotiationDTO = readPayload(request.getPayload(), TranslationNegotiationMgmtRequestDTO.class);
+			responseStatus = MqttStatus.CREATED;
 			responsePayload = negotiation(negotiationDTO);
 			break;
 
@@ -132,5 +133,4 @@ public class TranslationBridgeManagementMqttHandler extends MqttTopicHandler {
 
 		return mgmtService.queryOperation(queryDTO, baseTopic() + Constants.SERVICE_OP_QUERY);
 	}
-
 }
