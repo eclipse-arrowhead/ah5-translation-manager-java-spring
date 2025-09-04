@@ -179,7 +179,7 @@ public class TranslationBridgeMgmtValidation {
 					try {
 						return UUID.fromString(id.trim());
 					} catch (final IllegalArgumentException __) {
-						throw new InvalidParameterException("bridge identifier is invalid: " + id, origin);
+						throw new InvalidParameterException("Bridge identifier is invalid: " + id, origin);
 					}
 				}).toList();
 	}
@@ -216,7 +216,7 @@ public class TranslationBridgeMgmtValidation {
 		logger.debug("validateDiscoveryMgmtRequest started...");
 
 		if (dto == null) {
-			throw new InvalidParameterException("request is missing", origin);
+			throw new InvalidParameterException("Request is missing", origin);
 		}
 
 		if (Utilities.isEmpty(dto.candidates())) {
@@ -238,11 +238,11 @@ public class TranslationBridgeMgmtValidation {
 		}
 
 		if (Utilities.isEmpty(dto.interfaceTemplateNames())) {
-			throw new InvalidParameterException("interface template names list is missing", origin);
+			throw new InvalidParameterException("Interface template names list is missing", origin);
 		}
 
 		if (Utilities.containsNullOrEmpty(dto.interfaceTemplateNames())) {
-			throw new InvalidParameterException("interface template names list contains null or empty element", origin);
+			throw new InvalidParameterException("Interface template names list contains null or empty element", origin);
 		}
 
 		if (!Utilities.isEmpty(dto.flags())) {
@@ -250,11 +250,11 @@ public class TranslationBridgeMgmtValidation {
 					.keySet()
 					.forEach(k -> {
 						if (Utilities.isEmpty(k)) {
-							throw new InvalidParameterException("flag name is missing", origin);
+							throw new InvalidParameterException("Flag name is missing", origin);
 						}
 
 						if (!Utilities.isEnumValue(k.trim().toUpperCase(), TranslationDiscoveryFlag.class)) {
-							throw new InvalidParameterException("flag is invalid: " + k, origin);
+							throw new InvalidParameterException("Flag is invalid: " + k, origin);
 						}
 					});
 		}
@@ -277,11 +277,11 @@ public class TranslationBridgeMgmtValidation {
 		}
 
 		if (Utilities.isEmpty(candidate.interfaces())) {
-			throw new InvalidParameterException("Interfaces list is missing", origin);
+			throw new InvalidParameterException("interfaces list is missing", origin);
 		}
 
 		if (Utilities.containsNull(candidate.interfaces())) {
-			throw new InvalidParameterException("Interfaces list contains null element", origin);
+			throw new InvalidParameterException("interfaces list contains null element", origin);
 		}
 
 		candidate.interfaces().forEach(intf -> validateServiceInstanceInterface(intf, origin));
@@ -320,6 +320,7 @@ public class TranslationBridgeMgmtValidation {
 			systemNameValidator.validateSystemName(normalized.consumer());
 			operationValidator.validateServiceOperationName(normalized.operation());
 			normalized.interfaceTemplateNames().forEach(iName -> interfaceTemplateNameValidator.validateInterfaceTemplateName(iName));
+
 			if (normalized.inputDataModelId() != null) {
 				dataModelIdentifierValidator.validateDataModelIdentifier(normalized.inputDataModelId());
 			}
@@ -351,7 +352,7 @@ public class TranslationBridgeMgmtValidation {
 		logger.debug("validateNegotiationMgmtRequest started...");
 
 		if (dto == null) {
-			throw new InvalidParameterException("request is missing", origin);
+			throw new InvalidParameterException("Request is missing", origin);
 		}
 
 		if (Utilities.isEmpty(dto.bridgeId())) {
@@ -372,11 +373,11 @@ public class TranslationBridgeMgmtValidation {
 		logger.debug("validateAbortMgmtRequest started...");
 
 		if (Utilities.isEmpty(ids)) {
-			throw new InvalidParameterException("bridge id list is missing", origin);
+			throw new InvalidParameterException("Bridge id list is missing", origin);
 		}
 
 		if (Utilities.containsNullOrEmpty(ids)) {
-			throw new InvalidParameterException("bridge id list contains null or empty element", origin);
+			throw new InvalidParameterException("Bridge id list contains null or empty element", origin);
 		}
 	}
 
@@ -495,7 +496,7 @@ public class TranslationBridgeMgmtValidation {
 			}
 
 			if (dto.minUsage() != null && dto.minUsage().intValue() < 0) {
-				throw new InvalidParameterException("Minimum usage number is a non-negative number", origin);
+				throw new InvalidParameterException("Minimum usage number must be a non-negative number", origin);
 			}
 
 			if (dto.minUsage() != null && dto.minUsage() != null && dto.minUsage().intValue() > dto.maxUsage().intValue()) {
@@ -640,7 +641,7 @@ public class TranslationBridgeMgmtValidation {
 						dto.pagination().page(),
 						dto.pagination().size(),
 						dto.pagination().direction(),
-						BridgeDetails.SORT_NAME_ALTERNATIVES.getOrDefault(dto.pagination().sortField().trim(), dto.pagination().sortField()));
+						BridgeDetails.SORT_NAME_ALTERNATIVES.getOrDefault(dto.pagination().sortField().trim(), dto.pagination().sortField().trim()));
 
 		return new NormalizedTranslationQueryRequestDTO(
 				pageService.getPageRequest(normalizedPagination, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter"),

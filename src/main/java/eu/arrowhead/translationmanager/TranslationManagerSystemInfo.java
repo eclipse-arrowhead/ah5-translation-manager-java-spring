@@ -47,6 +47,9 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 	@Value(Constants.$FORCE_BLACKLIST_FILTER_WD)
 	private boolean forceBlackist;
 
+	@Value(TranslationManagerConstants.$ALLOW_DISCOVERY_FLAGS_WD)
+	private boolean allowDiscoveryFlags;
+
 	@Value(TranslationManagerConstants.$ENABLE_AUTHORIZATION_WD)
 	private boolean authorizationEnabled;
 
@@ -130,6 +133,11 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	public boolean isDiscoveryFlagsAllowed() {
+		return allowDiscoveryFlags;
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	public boolean isAuthorizationEnabled() {
 		return authorizationEnabled;
 	}
@@ -157,6 +165,7 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 						Constants.FORCE_BLACKLIST_FILTER,
 						Constants.MAX_PAGE_SIZE,
 						Constants.NORMALIZATION_MODE,
+						TranslationManagerConstants.ALLOW_DISCOVERY_FLAGS,
 						TranslationManagerConstants.ENABLE_AUTHORIZATION,
 						TranslationManagerConstants.TRANSLATOR_SERVICE_MIN_AVAILABILITY,
 						TranslationManagerConstants.ENABLE_CUSTOM_CONFIGURATION,

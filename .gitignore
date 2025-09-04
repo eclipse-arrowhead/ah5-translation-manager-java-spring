@@ -57,3 +57,4 @@ build/
 
 ### VS Code ###
 .vscode/
+/AH-TranslationManager-tcp1270014763/*.lck

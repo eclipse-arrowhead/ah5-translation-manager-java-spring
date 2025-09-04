@@ -536,7 +536,6 @@ public class TranslatorBridgeEngine {
 		logger.debug("calculateInterfaceTranslatorMap started...");
 
 		final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> result = new HashMap<>(targets.size());
-
 		interfaceTranslators.forEach(itp -> {
 			final Map<String, Object> interfaceBridge = (Map<String, Object>) itp.interfaces().get(0).properties().get(Constants.METADATA_KEY_INTERFACE_BRIDGE);
 			final String toInterface = interfaceBridge.get(Constants.METADATA_KEY_TO).toString();
@@ -579,7 +578,6 @@ public class TranslatorBridgeEngine {
 		logger.debug("createDiscoveryModels started...");
 
 		final List<TranslationDiscoveryModel> models = new ArrayList<>(candidates.size());
-
 		candidates.forEach(c -> {
 			final Pair<ServiceInstanceResponseDTO, String> selected = selectInterfaceTranslator(candidatesWithAppropriateTranslators.get(c.instanceId()), dto.interfaceTemplateNames());
 			// selected contains the interface translator and one common interface template name with the consumer
@@ -727,7 +725,6 @@ public class TranslatorBridgeEngine {
 		logger.debug("extendDiscoveryModels started...");
 
 		final List<TranslationDiscoveryModel> result = new ArrayList<>(models.size());
-
 		models.forEach(m -> {
 			boolean keep = true;
 			if (m.getInputDataModelIdRequirement() != null) {
@@ -855,7 +852,6 @@ public class TranslatorBridgeEngine {
 		logger.debug("handleInputDataModelTranslatorInNegotiation started...");
 
 		Map<String, Object> inputDataModelTranslatorSettings = null;
-
 		if (model.isInputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
 					model.getInputDataModelTranslatorProperties(),
@@ -889,7 +885,6 @@ public class TranslatorBridgeEngine {
 		logger.debug("handleOutputDataModelTranslatorInNegotiation started...");
 
 		Map<String, Object> outputDataModelTranslatorSettings = null;
-
 		if (model.isOutputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
 					model.getOutputDataModelTranslatorProperties(),

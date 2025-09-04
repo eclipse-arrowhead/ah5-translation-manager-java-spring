@@ -123,11 +123,21 @@ public class TranslationBridgeManagementService {
 	private Map<TranslationDiscoveryFlag, Boolean> mergeUserFlagsWithSettings(final Map<TranslationDiscoveryFlag, Boolean> userFlags) {
 		logger.debug("mergeUserFlagsWithSettings started...");
 
+		if (sysInfo.isDiscoveryFlagsAllowed()) {
+			return Map.of(
+					TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
+					TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
+					TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false) && sysInfo.isAuthorizationEnabled(),
+					TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
+					TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false) && sysInfo.isAuthorizationEnabled());
+		}
+
+		// user flags are ignored
 		return Map.of(
-				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
-				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
-				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false) && sysInfo.isAuthorizationEnabled(),
-				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false) && sysInfo.isBlacklistEnabled(),
-				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, userFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false) && sysInfo.isAuthorizationEnabled());
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, sysInfo.isAuthorizationEnabled(),
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, sysInfo.isBlacklistEnabled(),
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, sysInfo.isAuthorizationEnabled());
 	}
 }

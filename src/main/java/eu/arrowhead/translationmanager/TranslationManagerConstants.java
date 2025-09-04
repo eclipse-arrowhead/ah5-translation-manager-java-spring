@@ -43,6 +43,8 @@ public final class TranslationManagerConstants {
 	public static final String MQTT_API_GENERAL_MANAGEMENT_BASE_TOPIC = MQTT_API_BASE_TOPIC_PREFIX + "/general/management/";
 	public static final String MQTT_API_BRIDGE_MANAGEMENT_BASE_TOPIC = MQTT_API_BRIDGE_BASE_TOPIC + "management/";
 
+	public static final String ALLOW_DISCOVERY_FLAGS = "allow.discovery.flags";
+	public static final String $ALLOW_DISCOVERY_FLAGS_WD = "${" + ALLOW_DISCOVERY_FLAGS + ":" + TranslationManagerDefaults.ALLOW_DISCOVERY_FLAGS_DEFAULT + "}";
 	public static final String ENABLE_AUTHORIZATION = "enable.authorization";
 	public static final String $ENABLE_AUTHORIZATION_WD = "${" + ENABLE_AUTHORIZATION + ":" + TranslationManagerDefaults.ENABLE_AUTHORIZATION_DEFAULT + "}";
 	public static final String TRANSLATOR_SERVICE_MIN_AVAILABILITY = "translator.service.min.availability";

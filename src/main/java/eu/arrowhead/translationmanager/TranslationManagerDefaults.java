@@ -23,6 +23,7 @@ public final class TranslationManagerDefaults extends Defaults {
 	//=================================================================================================
 	// members
 
+	public static final String ALLOW_DISCOVERY_FLAGS_DEFAULT = "false";
 	public static final String ENABLE_AUTHORIZATION_DEFAULT = "false";
 	public static final String TRANSLATOR_SERVICE_MIN_AVAILABILITY_DEFAULT = "5";
 	public static final String ENABLE_CUSTOM_CONFIGURATION_DEFAULT = "false";

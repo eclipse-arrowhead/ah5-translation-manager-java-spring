@@ -146,13 +146,13 @@ public class TranslationBridgeValidation {
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		if (Utilities.isEmpty(bridgeId)) {
-			throw new InvalidParameterException("bridge identifier is missing");
+			throw new InvalidParameterException("Bridge identifier is missing");
 		}
 
 		try {
 			return UUID.fromString(bridgeId.trim());
 		} catch (final IllegalArgumentException __) {
-			throw new InvalidParameterException("bridge identifier is invalid");
+			throw new InvalidParameterException("Bridge identifier is invalid");
 		}
 	}
 
@@ -176,7 +176,7 @@ public class TranslationBridgeValidation {
 		logger.debug("validateDiscoveryRequest started...");
 
 		if (dto == null) {
-			throw new InvalidParameterException("request is missing", origin);
+			throw new InvalidParameterException("Request is missing", origin);
 		}
 
 		if (Utilities.isEmpty(dto.candidates())) {
@@ -194,11 +194,11 @@ public class TranslationBridgeValidation {
 		}
 
 		if (Utilities.isEmpty(dto.interfaceTemplateNames())) {
-			throw new InvalidParameterException("interface template names list is missing", origin);
+			throw new InvalidParameterException("Interface template names list is missing", origin);
 		}
 
 		if (Utilities.containsNullOrEmpty(dto.interfaceTemplateNames())) {
-			throw new InvalidParameterException("interface template names list contains null or empty element", origin);
+			throw new InvalidParameterException("Interface template names list contains null or empty element", origin);
 		}
 	}
 
@@ -219,11 +219,11 @@ public class TranslationBridgeValidation {
 		}
 
 		if (Utilities.isEmpty(candidate.interfaces())) {
-			throw new InvalidParameterException("Interfaces list is missing", origin);
+			throw new InvalidParameterException("Interface list is missing", origin);
 		}
 
 		if (Utilities.containsNull(candidate.interfaces())) {
-			throw new InvalidParameterException("Interfaces list contains null element", origin);
+			throw new InvalidParameterException("Interface list contains null element", origin);
 		}
 
 		candidate.interfaces().forEach(intf -> validateServiceInstanceInterface(intf, origin));
@@ -231,7 +231,7 @@ public class TranslationBridgeValidation {
 
 	//-------------------------------------------------------------------------------------------------
 	private void validateServiceInstanceInterface(final ServiceInstanceInterfaceResponseDTO intf, final String origin) {
-		logger.debug("validateCandidate started...");
+		logger.debug("validateServiceInstanceInterface started...");
 
 		if (Utilities.isEmpty(intf.templateName())) {
 			throw new InvalidParameterException("Template name is missing", origin);
@@ -293,7 +293,7 @@ public class TranslationBridgeValidation {
 		logger.debug("validateNegotiationRequest started...");
 
 		if (dto == null) {
-			throw new InvalidParameterException("request is missing", origin);
+			throw new InvalidParameterException("Request is missing", origin);
 		}
 
 		if (dto.target() == null) {

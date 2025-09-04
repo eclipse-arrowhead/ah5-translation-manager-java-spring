@@ -115,12 +115,8 @@ public class TranslationReportValidation {
 			throw new InvalidParameterException("Timestamp is missing", origin);
 		}
 
-		final ZonedDateTime now = Utilities.utcNow();
 		try {
-			final ZonedDateTime timestamp = Utilities.parseUTCStringToZonedDateTime(dto.timestamp());
-			if (timestamp.isAfter(now)) {
-				throw new InvalidParameterException("Timestamp is referenced a moment in the future", origin);
-			}
+			Utilities.parseUTCStringToZonedDateTime(dto.timestamp());
 		} catch (final DateTimeParseException ex) {
 			throw new InvalidParameterException("Timestamp is invalid", origin);
 		}
@@ -139,10 +135,16 @@ public class TranslationReportValidation {
 
 	//-------------------------------------------------------------------------------------------------
 	private NormalizedTranslationReportRequestDTO normalizeReport(final String requester, final TranslationReportRequestDTO dto) {
+		final ZonedDateTime now = Utilities.utcNow();
+		ZonedDateTime timestamp = Utilities.parseUTCStringToZonedDateTime(dto.timestamp());
+		if (timestamp.isAfter(now)) {
+			// maybe clocks out of sync, so we use 'now' as timestamp
+			timestamp = now;
+		}
 		return new NormalizedTranslationReportRequestDTO(
 				requester,
 				UUID.fromString(dto.bridgeId().trim()),
-				Utilities.parseUTCStringToZonedDateTime(dto.timestamp()),
+				timestamp,
 				TranslationBridgeEventState.valueOf(dto.state().trim().toUpperCase()),
 				Utilities.isEmpty(dto.errorMessage()) ? null : dto.errorMessage().trim());
 	}
