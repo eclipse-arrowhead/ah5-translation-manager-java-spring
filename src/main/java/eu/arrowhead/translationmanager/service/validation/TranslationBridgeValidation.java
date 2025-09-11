@@ -142,17 +142,17 @@ public class TranslationBridgeValidation {
 
 	//-------------------------------------------------------------------------------------------------
 	public UUID validateAndNormalizeBridgeId(final String bridgeId, final String origin) {
-		logger.debug("validateAndNormalizeNegotiationRequest started...");
+		logger.debug("validateAndNormalizeBridgeId started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		if (Utilities.isEmpty(bridgeId)) {
-			throw new InvalidParameterException("Bridge identifier is missing");
+			throw new InvalidParameterException("Bridge identifier is missing", origin);
 		}
 
 		try {
 			return UUID.fromString(bridgeId.trim());
 		} catch (final IllegalArgumentException __) {
-			throw new InvalidParameterException("Bridge identifier is invalid");
+			throw new InvalidParameterException("Bridge identifier is invalid", origin);
 		}
 	}
 
