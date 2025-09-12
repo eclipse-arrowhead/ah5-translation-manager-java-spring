@@ -297,6 +297,7 @@ public class InterfaceTranslatorDriver {
 				model.getFromInterfaceTemplate(),
 				inputDataModelTranslator,
 				resultDataModelTranslator,
+				model.getToInterfaceTemplate(),
 				model.getTargetProperties(),
 				model.getOperation(),
 				token,
