@@ -473,25 +473,25 @@ public class TranslationBridgeMgmtValidation {
 				throw new InvalidParameterException("Empty creation time interval", origin);
 			}
 
-			ZonedDateTime aliveFrom = null;
-			if (!Utilities.isEmpty(dto.aliveFrom())) {
+			ZonedDateTime alivesFrom = null;
+			if (!Utilities.isEmpty(dto.alivesFrom())) {
 				try {
-					aliveFrom = Utilities.parseUTCStringToZonedDateTime(dto.aliveFrom());
+					alivesFrom = Utilities.parseUTCStringToZonedDateTime(dto.alivesFrom());
 				} catch (final DateTimeException ex) {
 					throw new InvalidParameterException("Minimum alive time has an invalid time format", origin);
 				}
 			}
 
-			ZonedDateTime aliveTo = null;
-			if (!Utilities.isEmpty(dto.aliveTo())) {
+			ZonedDateTime alivesTo = null;
+			if (!Utilities.isEmpty(dto.alivesTo())) {
 				try {
-					aliveTo = Utilities.parseUTCStringToZonedDateTime(dto.aliveTo());
+					alivesTo = Utilities.parseUTCStringToZonedDateTime(dto.alivesTo());
 				} catch (final DateTimeException ex) {
 					throw new InvalidParameterException("Maximum alive time has an invalid time format", origin);
 				}
 			}
 
-			if (aliveFrom != null && aliveTo != null && aliveTo.isBefore(aliveFrom)) {
+			if (alivesFrom != null && alivesTo != null && alivesTo.isBefore(alivesFrom)) {
 				throw new InvalidParameterException("Empty alive time interval", origin);
 			}
 
@@ -655,8 +655,8 @@ public class TranslationBridgeMgmtValidation {
 				Utilities.isEmpty(dto.dataModelTranslators()) ? null : dto.dataModelTranslators().stream().map(dmt -> systemNameNormalizer.normalize(dmt)).toList(),
 				Utilities.parseUTCStringToZonedDateTime(dto.creationFrom()),
 				Utilities.parseUTCStringToZonedDateTime(dto.creationTo()),
-				Utilities.parseUTCStringToZonedDateTime(dto.aliveFrom()),
-				Utilities.parseUTCStringToZonedDateTime(dto.aliveTo()),
+				Utilities.parseUTCStringToZonedDateTime(dto.alivesFrom()),
+				Utilities.parseUTCStringToZonedDateTime(dto.alivesTo()),
 				dto.minUsage(),
 				dto.maxUsage());
 	}

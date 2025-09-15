@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `bridge_header` (
   `status` varchar(14) NOT NULL DEFAULT 'NEW',
   `message` mediumtext,
   `usage_report_count` integer NOT NULL DEFAULT 0,
-  `alive_at` timestamp,
+  `alives_at` timestamp,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

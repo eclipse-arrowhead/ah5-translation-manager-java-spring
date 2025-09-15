@@ -48,7 +48,7 @@ public class BridgeHeader extends ArrowheadEntity {
 	private int usageReportCount = 0;
 
 	@Column(nullable = true)
-	private ZonedDateTime aliveAt;
+	private ZonedDateTime alivesAt;
 
 	//=================================================================================================
 	// methods
@@ -67,7 +67,7 @@ public class BridgeHeader extends ArrowheadEntity {
 	@Override
 	public String toString() {
 		return "BridgeHeader [id=" + id + ", uuid=" + uuid + ", createdBy=" + getCreatedBy() + ", status=" + status + ", message=" + message + ", usageReportCount=" + usageReportCount
-				+ ", aliveAt=" + aliveAt + ", updatedAt=" + updatedAt + ", createdAt=" + createdAt + "]";
+				+ ", alivesAt=" + alivesAt + ", updatedAt=" + updatedAt + ", createdAt=" + createdAt + "]";
 	}
 
 	//=================================================================================================
@@ -124,12 +124,12 @@ public class BridgeHeader extends ArrowheadEntity {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public ZonedDateTime getAliveAt() {
-		return aliveAt;
+	public ZonedDateTime getAlivesAt() {
+		return alivesAt;
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public void setAliveAt(final ZonedDateTime aliveAt) {
-		this.aliveAt = aliveAt;
+	public void setAlivesAt(final ZonedDateTime alivesAt) {
+		this.alivesAt = alivesAt;
 	}
 }

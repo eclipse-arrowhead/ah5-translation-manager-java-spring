@@ -105,7 +105,7 @@ public class BridgeDbService {
 
 			synchronized (LOCK) {
 				header.setStatus(toStatus);
-				header.setAliveAt(dto.timestamp());
+				header.setAlivesAt(dto.timestamp());
 				if (TranslationBridgeStatus.USED == toStatus) {
 					header.setUsageReportCount(header.getUsageReportCount() + 1);
 				}
@@ -503,15 +503,15 @@ public class BridgeDbService {
 					continue;
 				}
 
-				// Match against alive from
-				if (dto.aliveFrom() != null
-						&& (record.getHeader().getAliveAt() == null || record.getHeader().getAliveAt().isBefore(dto.aliveFrom()))) {
+				// Match against alives from
+				if (dto.alivesFrom() != null
+						&& (record.getHeader().getAlivesAt() == null || record.getHeader().getAlivesAt().isBefore(dto.alivesFrom()))) {
 					continue;
 				}
 
-				// Match against alive to
-				if (dto.aliveTo() != null
-						&& (record.getHeader().getAliveAt() == null || record.getHeader().getAliveAt().isAfter(dto.aliveTo()))) {
+				// Match against alives to
+				if (dto.alivesTo() != null
+						&& (record.getHeader().getAlivesAt() == null || record.getHeader().getAlivesAt().isAfter(dto.alivesTo()))) {
 					continue;
 				}
 

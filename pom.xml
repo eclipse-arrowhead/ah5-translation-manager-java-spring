@@ -13,7 +13,7 @@
 	<name>Arrowhead System Translation Manager</name>
 	<description>Arrowhead System TranslationManager using Spring Boot</description>
 	
-	<url>https://github.com/Aitia-IIOT/ah5-translation-manager-java-spring</url>
+	<url>https://github.com/eclipse-arrowhead/ah5-translation-manager-java-spring</url>
 	<licenses>
     	<license>
 	     	<name>Eclipse Public License - v 2.0</name>
@@ -25,7 +25,6 @@
 		<revision>5.1.0</revision>
 		<ah.common.version>5.1.0</ah.common.version>
 		<mvn.resources.version>3.3.1</mvn.resources.version>
-		<mysql.jdbc.driver>8.0.28</mysql.jdbc.driver>
 		<lmax.disruptor.version>4.0.0</lmax.disruptor.version>
 	</properties>
 	
@@ -76,9 +75,8 @@
 			<artifactId>spring-boot-starter-integration</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
-			<version>${mysql.jdbc.driver}</version>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>

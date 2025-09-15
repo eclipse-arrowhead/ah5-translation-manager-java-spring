@@ -62,7 +62,7 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 	//-------------------------------------------------------------------------------------------------
 	@Override
 	public String getSystemName() {
-		return Constants.SYS_NAME_TRANSLATIONMANAGER;
+		return Constants.SYS_NAME_TRANSLATION_MANAGER;
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -97,7 +97,6 @@ public class TranslationManagerSystemInfo extends SystemInfo {
 		final ServiceModel translationBridge = new ServiceModel.Builder()
 				.serviceDefinition(Constants.SERVICE_DEF_TRANSLATION_BRIDGE)
 				.version(TranslationManagerConstants.VERSION_TRANSLATION_BRIDGE)
-				.metadata(Constants.METADATA_KEY_UNRESTRICTED_DISCOVERY, true)
 				.serviceInterface(getHttpServiceInterfaceForTranslationBridge())
 				.serviceInterface(getMqttServiceInterfaceForTranslationBridge())
 				.build();

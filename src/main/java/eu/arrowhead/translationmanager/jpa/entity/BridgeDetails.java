@@ -41,7 +41,7 @@ public class BridgeDetails {
 	public static final String SORT_NAME_HEADER_CREATED_BY = "header_createdBy";
 	public static final String SORT_NAME_HEADER_STATUS = "header_status";
 	public static final String SORT_NAME_HEADER_USAGE_REPORT_COUNT = "header_usageReportCount";
-	public static final String SORT_NAME_HEADER_ALIVE_AT = "header_aliveAt";
+	public static final String SORT_NAME_HEADER_ALIVES_AT = "header_alivesAt";
 
 	public static final Map<String, String> SORT_NAME_ALTERNATIVES = Map.of(
 			"bridgeId", SORT_NAME_HEADER_UUID,
@@ -51,14 +51,14 @@ public class BridgeDetails {
 			"status", SORT_NAME_HEADER_STATUS,
 			"usage", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
 			"usageReportCount", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
-			"aliveAt", SORT_NAME_HEADER_ALIVE_AT);
+			"alivesAt", SORT_NAME_HEADER_ALIVES_AT);
 
 	public static final List<String> SORTABLE_FIELDS_BY = List.of(
 			SORT_NAME_HEADER_UUID,
 			SORT_NAME_HEADER_CREATED_BY,
 			SORT_NAME_HEADER_STATUS,
 			SORT_NAME_HEADER_USAGE_REPORT_COUNT,
-			SORT_NAME_HEADER_ALIVE_AT,
+			SORT_NAME_HEADER_ALIVES_AT,
 			"consumer",
 			"provider",
 			"serviceDefinition");

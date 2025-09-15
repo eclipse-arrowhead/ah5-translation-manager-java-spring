@@ -37,8 +37,8 @@ public record NormalizedTranslationQueryRequestDTO(
 		List<String> dataModelTranslators,
 		ZonedDateTime creationFrom,
 		ZonedDateTime creationTo,
-		ZonedDateTime aliveFrom,
-		ZonedDateTime aliveTo,
+		ZonedDateTime alivesFrom,
+		ZonedDateTime alivesTo,
 		Integer minUsage,
 		Integer maxUsage) {
 
@@ -57,8 +57,8 @@ public record NormalizedTranslationQueryRequestDTO(
 				|| !Utilities.isEmpty(dataModelTranslators)
 				|| creationFrom != null
 				|| creationTo != null
-				|| aliveFrom != null
-				|| aliveTo != null
+				|| alivesFrom != null
+				|| alivesTo != null
 				|| minUsage != null
 				|| maxUsage != null;
 	}

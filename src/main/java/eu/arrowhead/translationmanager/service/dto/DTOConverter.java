@@ -71,7 +71,7 @@ public class DTOConverter {
 							e.getHeader().getUuid(),
 							e.getHeader().getStatus().name(),
 							e.getHeader().getUsageReportCount(),
-							Utilities.convertZonedDateTimeToUTCString(e.getHeader().getAliveAt()),
+							Utilities.convertZonedDateTimeToUTCString(e.getHeader().getAlivesAt()),
 							e.getHeader().getMessage(),
 							e.getConsumer(),
 							e.getProvider(),
