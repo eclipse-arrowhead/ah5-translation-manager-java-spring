@@ -56,6 +56,8 @@ public final class TranslationManagerConstants {
 	public static final String CLEANER_JOB_INTERVAL = "cleaner.job.interval";
 	public static final String $CLEANER_JOB_INTERVAL_WD = "${" + CLEANER_JOB_INTERVAL + ":" + TranslationManagerDefaults.CLEANER_JOB_INTERVAL_DEFAULT + "}";
 
+	public static final String POLICY_TRANSLATION_BRIDGE_TOKEN_AUTH = "TRANSLATION_BRIDGE_TOKEN_AUTH";
+
 	// operation related
 
 	public static final String HTTP_API_OP_REPORT_PATH = "/report";

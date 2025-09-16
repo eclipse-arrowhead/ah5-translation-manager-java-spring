@@ -45,6 +45,7 @@ import eu.arrowhead.common.service.validation.meta.MetadataRequirementTokenizer;
 import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtListRequestDTO;
 import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtRequestDTO;
 import eu.arrowhead.dto.AuthorizationTokenMgmtListResponseDTO;
+import eu.arrowhead.dto.AuthorizationTokenResponseDTO;
 import eu.arrowhead.dto.AuthorizationVerifyListRequestDTO;
 import eu.arrowhead.dto.AuthorizationVerifyListResponseDTO;
 import eu.arrowhead.dto.AuthorizationVerifyRequestDTO;
@@ -219,7 +220,7 @@ public class CoreSystemsDriver {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public String generateTokenForInterfaceTranslatorToTargetOperation(
+	public AuthorizationTokenResponseDTO generateTokenForInterfaceTranslatorToTargetOperation(
 			final String policy,
 			final String interfaceTranslator,
 			final String targetProvider,
@@ -243,8 +244,7 @@ public class CoreSystemsDriver {
 
 		return response
 				.entries()
-				.get(0)
-				.token();
+				.get(0);
 	}
 
 	//-------------------------------------------------------------------------------------------------

@@ -45,6 +45,7 @@ import eu.arrowhead.common.service.validation.meta.MetaOps;
 import eu.arrowhead.common.service.validation.meta.MetadataRequirementTokenizer;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierNormalizer;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierValidator;
+import eu.arrowhead.dto.AuthorizationTokenResponseDTO;
 import eu.arrowhead.dto.MetadataRequirementDTO;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
@@ -54,6 +55,7 @@ import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationInterfaceTranslationDataDescriptorDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
+import eu.arrowhead.translationmanager.TranslationManagerConstants;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.jpa.service.BridgeDbService;
@@ -223,9 +225,9 @@ public class TranslatorBridgeEngine {
 			}
 
 			// token handling for target
-			String token = null;
+			AuthorizationTokenResponseDTO tokenInfo = null;
 			if (model.getTargetPolicy().endsWith(Constants.AUTHORIZATION_TOKEN_VARIANT_SUFFIX)) {
-				token = csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
+				tokenInfo = csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
 						model.getTargetPolicy(),
 						model.getInterfaceTranslator(),
 						ServiceInstanceIdUtils.retrieveSystemNameFromInstanceId(model.getTargetInstanceId()),
@@ -236,7 +238,7 @@ public class TranslatorBridgeEngine {
 			final Pair<Optional<ServiceInstanceInterfaceResponseDTO>, Optional<ArrowheadException>> bridgeResult = itDriver.initializeBridge(
 					bridgeId,
 					model,
-					token,
+					tokenInfo != null ? tokenInfo.token() : null,
 					interfaceTranslatorSettings,
 					model.getInterfaceTranslatorToken(),
 					inputTranslatorSettings,
@@ -244,6 +246,17 @@ public class TranslatorBridgeEngine {
 
 			if (bridgeResult.getSecond().isEmpty()) {
 				// success
+
+				if (!TranslationManagerConstants.POLICY_TRANSLATION_BRIDGE_TOKEN_AUTH
+						.equals(bridgeResult.getFirst().get().policy().trim().toUpperCase())) {
+					// policy is not match with the expected
+
+					dbService.storeBridgeProblem(bridgeId, "Invalid policy from interface provider: " + bridgeResult.getFirst().get().policy());
+					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties(), model.getInterfaceTranslatorToken());
+
+					throw new ExternalServerError("Interface provider returns with invalid data", origin);
+				}
+
 				isBridgeInEndState = dbService.bridgeInitialized(detailsRecord.getHeader());
 				if (isBridgeInEndState) {
 					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties(), model.getInterfaceTranslatorToken());
@@ -253,7 +266,9 @@ public class TranslatorBridgeEngine {
 
 				return new TranslationNegotiationResponseDTO(
 						bridgeId.toString(),
-						bridgeResult.getFirst().get());
+						bridgeResult.getFirst().get(),
+						tokenInfo != null ? tokenInfo.expiresAt() : null,
+						tokenInfo != null ? tokenInfo.usageLimit() : null);
 			}
 
 			// error in bridge initialization
