@@ -97,7 +97,7 @@ public class TranslationBridgeService {
 
 			if (Utilities.isEmpty(discoveryResult.bridgeId())) {
 				// translation is not possible
-				return new TranslationNegotiationResponseDTO(null, null);
+				return new TranslationNegotiationResponseDTO(null, null, null, null);
 			}
 
 			normalized = new NormalizedTranslationNegotiationRequestDTO(
