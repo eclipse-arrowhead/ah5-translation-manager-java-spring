@@ -144,6 +144,9 @@ public class TranslatorBridgeEngine {
 					tokens,
 					dto.operation(),
 					candidates);
+			if (candidatesWithAppropriateInterfaceTranslators.isEmpty()) {
+				return new TranslationDiscoveryResponseDTO(null, List.of());
+			}
 
 			// creating initial discovery models
 			List<TranslationDiscoveryModel> models = createDiscoveryModels(dto, candidates, candidatesWithAppropriateInterfaceTranslators, tokens);
@@ -552,7 +555,7 @@ public class TranslatorBridgeEngine {
 
 		final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> result = new HashMap<>(targets.size());
 		interfaceTranslators.forEach(itp -> {
-			final Map<String, Object> interfaceBridge = (Map<String, Object>) itp.interfaces().get(0).properties().get(Constants.METADATA_KEY_INTERFACE_BRIDGE);
+			final Map<String, Object> interfaceBridge = (Map<String, Object>) itp.metadata().get(Constants.METADATA_KEY_INTERFACE_BRIDGE);
 			final String toInterface = interfaceBridge.get(Constants.METADATA_KEY_TO).toString();
 
 			List<NormalizedServiceInstanceDTO> relatedTargets = targets
@@ -606,12 +609,12 @@ public class TranslatorBridgeEngine {
 						dto.inputDataModelId(),
 						dto.outputDataModelId());
 				model.setFromInterfaceTemplate(selected.getSecond());
+				model.setToInterfaceTemplate(((Map) selected.getFirst().metadata().get(Constants.METADATA_KEY_INTERFACE_BRIDGE)).get(Constants.METADATA_KEY_TO).toString());
 				model.setInterfaceTranslator(selected.getFirst().provider().name());
 				final ServiceInstanceInterfaceResponseDTO interfaceDTO = selected.getFirst().interfaces().get(0);
 				model.setInterfaceTranslatorPolicy(interfaceDTO.policy());
 				model.setInterfaceTranslatorToken(tokens.get(model.getInterfaceTranslator()));
 				model.setInterfaceTranslatorProperties(interfaceDTO.properties());
-				model.setToInterfaceTemplate(((Map) model.getInterfaceTranslatorProperties().get(Constants.METADATA_KEY_INTERFACE_BRIDGE)).get(Constants.METADATA_KEY_TO).toString());
 
 				final ServiceInstanceInterfaceResponseDTO selectedTargetInterface = c.interfaces()
 						.stream()

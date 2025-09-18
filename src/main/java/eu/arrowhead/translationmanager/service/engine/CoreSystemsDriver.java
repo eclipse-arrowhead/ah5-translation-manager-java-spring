@@ -204,6 +204,11 @@ public class CoreSystemsDriver {
 		Assert.isTrue(!Utilities.containsNull(interfaceTranslators), "interfaceTranslators list contains null element");
 
 		final AuthorizationTokenGenerationMgmtListRequestDTO payload = calculateTokenGenerationPayloadForInterfaceBridgeManagementService(interfaceTranslators);
+		if (Utilities.isEmpty(payload.list())) {
+			// no tokens
+			return Map.of();
+		}
+
 		final AuthorizationTokenMgmtListResponseDTO response = ahHttpService.consumeService(
 				Constants.SERVICE_DEF_AUTHORIZATION_TOKEN_MANAGEMENT,
 				Constants.SERVICE_OP_AUTHORIZATION_GENERATE_TOKENS,
@@ -253,7 +258,7 @@ public class CoreSystemsDriver {
 		Assert.isTrue(!Utilities.isEmpty(inputInterfaceRequirements), "inputInterfaceRequirements list is missing");
 		Assert.isTrue(!Utilities.containsNullOrEmpty(inputInterfaceRequirements), "inputInterfaceRequirements list contains null or empty element");
 		Assert.isTrue(!Utilities.isEmpty(targets), "targets list is missing");
-		Assert.isTrue(!Utilities.containsNull(null), "targets list contains null element");
+		Assert.isTrue(!Utilities.containsNull(targets), "targets list contains null element");
 
 		final ServiceInstanceLookupRequestDTO payload = calculateInterfaceTranslatorLookupPayload(inputInterfaceRequirements, targets);
 		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
@@ -319,7 +324,6 @@ public class CoreSystemsDriver {
 		logger.debug("calculateTokenGenerationPayloadForInterfaceBridgeManagementService started...");
 
 		final ZonedDateTime now = Utilities.utcNow();
-
 		final List<AuthorizationTokenGenerationMgmtRequestDTO> list = new ArrayList<>(interfaceTranslators.size());
 
 		interfaceTranslators
