@@ -827,6 +827,10 @@ public class TranslatorBridgeEngine {
 				.filter(dmc -> MetadataRequirementsMatcher.isMetadataMatch(dmc.metadata(), req))
 				.toList();
 
+		if (relatedTranslators.isEmpty()) {
+			return null;
+		}
+
 		// authorization check that the interface translator have access to data model providers' service
 		final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
 				relatedTranslators.stream().map(c -> c.provider().name()).toList(),
