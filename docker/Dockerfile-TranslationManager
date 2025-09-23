@@ -23,7 +23,7 @@ ARG AH_VERSION
 ENV AH_VERSION=$AH_VERSION
 
 WORKDIR /app
-COPY --from=build /app/target/arrowhead-translation-manager-5.0.0.jar arrowhead-translation-manager-5.0.0.jar
+COPY --from=build /app/target/arrowhead-translation-manager-${AH_VERSION}.jar arrowhead-translation-manager-${AH_VERSION}.jar
 COPY --from=build /app/target/application.properties config_temp/application.properties
 COPY --from=build /app/target/log4j2.xml config_temp/log4j2.xml
 COPY --from=build /app/src/main/resources/certificate config_temp/certificte
