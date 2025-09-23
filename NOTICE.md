@@ -29,6 +29,7 @@ The project maintains the following source code repositories:
 * https://github.com/eclipse-arrowhead/ah5-common-java-spring
 * https://github.com/eclipse-arrowhead/ah5-core-java-spring
 * https://github.com/eclipse-arrowhead/ah5-blacklist-java-spring
+* https://github.com/eclipse-arrowhead/ah5-translation-manager-java-spring
 
 ## Third-party Content
 
@@ -79,6 +80,7 @@ maven/mavencentral/jakarta.persistence/jakarta.persistence-api/3.1.0	 EPL-2.0 OR
 maven/mavencentral/jakarta.transaction/jakarta.transaction-api/2.0.1	 EPL-2.0 OR GPL-2.0-only with Classpath-exception-2.0
 maven/mavencentral/jakarta.validation/jakarta.validation-api/3.0.2	 Apache-2.0
 maven/mavencentral/jakarta.xml.bind/jakarta.xml.bind-api/4.0.2	 BSD-3-Clause
+maven/mavencentral/com.mysql/mysql-connector-j/9.4.0 GPL-2.0 with Universal FOSS Exception, v1.0
 maven/mavencentral/org.antlr/antlr4-runtime/4.13.0	 BSD-3-Clause
 maven/mavencentral/org.apache.commons/commons-lang3/3.14.0	 Apache-2.0
 maven/mavencentral/org.apache.logging.log4j/log4j-api/2.23.1	 Apache-2.0
