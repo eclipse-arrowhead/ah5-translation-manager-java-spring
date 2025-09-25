@@ -499,7 +499,11 @@ public class TranslationBridgeMgmtValidation {
 				throw new InvalidParameterException("Minimum usage number must be a non-negative number", origin);
 			}
 
-			if (dto.minUsage() != null && dto.minUsage() != null && dto.minUsage().intValue() > dto.maxUsage().intValue()) {
+			if (dto.maxUsage() != null && dto.maxUsage().intValue() < 0) {
+				throw new InvalidParameterException("Maximum usage number must be a non-negative number", origin);
+			}
+
+			if (dto.minUsage() != null && dto.maxUsage() != null && dto.minUsage().intValue() > dto.maxUsage().intValue()) {
 				throw new InvalidParameterException("Empty usage interval", origin);
 			}
 		}
