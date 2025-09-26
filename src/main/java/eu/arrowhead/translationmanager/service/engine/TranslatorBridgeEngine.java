@@ -538,7 +538,28 @@ public class TranslatorBridgeEngine {
 			}
 		}
 
-		// authorization check for the interface translators are not necessary, because they "create" a new service/operation for the consumer
+		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false)) {
+			// authorization check that the TranslationManager has access to interface translators' service
+			final List<String> allowedInterfaceTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
+					interfaceTranslatorCandidates
+							.stream()
+							.map(c -> c.provider().name())
+							.toList(),
+					sysInfo.getSystemName(),
+					Constants.SERVICE_DEF_INTERFACE_BRIDGE_MANAGEMENT,
+					null);
+
+			if (allowedInterfaceTranslators.isEmpty()) {
+				return List.of();
+			} else {
+				interfaceTranslatorCandidates = interfaceTranslatorCandidates
+						.stream()
+						.filter(c -> allowedInterfaceTranslators.contains(c.provider().name()))
+						.toList();
+			}
+		}
+
+		// authorization check for the interface translators (regarding the consumer) are not necessary, because they "create" a new service/operation for the consumer
 		// and the consumer with the related bridge identifier can use it without any further authorization
 
 		return interfaceTranslatorCandidates;
@@ -831,7 +852,7 @@ public class TranslatorBridgeEngine {
 			return null;
 		}
 
-		// authorization check that the interface translator have access to data model providers' service
+		// authorization check that the interface translator have access to data model translators' service
 		final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
 				relatedTranslators.stream().map(c -> c.provider().name()).toList(),
 				model.getInterfaceTranslator(),
