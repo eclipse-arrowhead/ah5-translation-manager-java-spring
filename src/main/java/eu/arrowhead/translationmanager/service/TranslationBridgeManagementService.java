@@ -110,7 +110,7 @@ public class TranslationBridgeManagementService {
 		logger.debug("queryOperation started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
-		final NormalizedTranslationQueryRequestDTO normalized = validator.validateAndNormalizedQueryMgmtRequest(dto, origin);
+		final NormalizedTranslationQueryRequestDTO normalized = validator.validateAndNormalizeQueryMgmtRequest(dto, origin);
 		final Page<BridgeDetails> page = dbService.getBridgeDetailsPage(normalized);
 
 		return converter.convertBridgeDetailsPage(page);
