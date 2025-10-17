@@ -42,6 +42,7 @@ public class BridgeDetails {
 	public static final String SORT_NAME_HEADER_STATUS = "header_status";
 	public static final String SORT_NAME_HEADER_USAGE_REPORT_COUNT = "header_usageReportCount";
 	public static final String SORT_NAME_HEADER_ALIVES_AT = "header_alivesAt";
+	public static final String SORT_NAME_HEADER_CREATED_AT = "header_createdAt";
 
 	public static final Map<String, String> SORT_NAME_ALTERNATIVES = Map.of(
 			"bridgeId", SORT_NAME_HEADER_UUID,
@@ -51,7 +52,8 @@ public class BridgeDetails {
 			"status", SORT_NAME_HEADER_STATUS,
 			"usage", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
 			"usageReportCount", SORT_NAME_HEADER_USAGE_REPORT_COUNT,
-			"alivesAt", SORT_NAME_HEADER_ALIVES_AT);
+			"alivesAt", SORT_NAME_HEADER_ALIVES_AT,
+			"createdAt", SORT_NAME_HEADER_CREATED_AT);
 
 	public static final List<String> SORTABLE_FIELDS_BY = List.of(
 			SORT_NAME_HEADER_UUID,
@@ -59,12 +61,13 @@ public class BridgeDetails {
 			SORT_NAME_HEADER_STATUS,
 			SORT_NAME_HEADER_USAGE_REPORT_COUNT,
 			SORT_NAME_HEADER_ALIVES_AT,
+			SORT_NAME_HEADER_CREATED_AT,
 			"consumer",
 			"provider",
 			"serviceDefinition");
 
 	public static final List<String> ACCEPTABLE_SORT_FIELDS = Stream.concat(SORTABLE_FIELDS_BY.stream(), SORT_NAME_ALTERNATIVES.keySet().stream()).toList();
-	public static final String DEFAULT_SORT_FIELD = SORT_NAME_HEADER_CREATED_BY;
+	public static final String DEFAULT_SORT_FIELD = SORT_NAME_HEADER_CREATED_AT;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

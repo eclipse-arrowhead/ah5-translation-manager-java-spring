@@ -185,8 +185,8 @@ public class TranslationBridgeMgmtValidation {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public NormalizedTranslationQueryRequestDTO validateAndNormalizedQueryMgmtRequest(final TranslationQueryRequestDTO dto, final String origin) {
-		logger.debug("validateAndNormalizedQueryMgmtRequest started...");
+	public NormalizedTranslationQueryRequestDTO validateAndNormalizeQueryMgmtRequest(final TranslationQueryRequestDTO dto, final String origin) {
+		logger.debug("validateAndNormalizeQueryMgmtRequest started...");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		validateQueryMgmtRequest(dto, origin);
