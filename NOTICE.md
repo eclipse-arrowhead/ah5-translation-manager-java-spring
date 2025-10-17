@@ -30,6 +30,7 @@ The project maintains the following source code repositories:
 * https://github.com/eclipse-arrowhead/ah5-core-java-spring
 * https://github.com/eclipse-arrowhead/ah5-blacklist-java-spring
 * https://github.com/eclipse-arrowhead/ah5-translation-manager-java-spring
+* https://github.com/eclipse-arrowhead/ah5-device-qos-evaluator-java-spring
 
 ## Third-party Content
 
