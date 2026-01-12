@@ -41,8 +41,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.util.Pair;
 
+import eu.arrowhead.common.Utilities;
 import eu.arrowhead.common.exception.ArrowheadException;
 import eu.arrowhead.common.exception.InvalidParameterException;
 import eu.arrowhead.common.service.PageService;
@@ -59,15 +62,20 @@ import eu.arrowhead.common.service.validation.name.SystemNameNormalizer;
 import eu.arrowhead.common.service.validation.name.SystemNameValidator;
 import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIdentifierNormalizer;
 import eu.arrowhead.common.service.validation.serviceinstance.ServiceInstanceIdentifierValidator;
+import eu.arrowhead.dto.PageDTO;
 import eu.arrowhead.dto.ServiceDefinitionResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
 import eu.arrowhead.dto.SystemResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryMgmtRequestDTO;
 import eu.arrowhead.dto.TranslationNegotiationMgmtRequestDTO;
+import eu.arrowhead.dto.TranslationQueryRequestDTO;
+import eu.arrowhead.dto.enums.TranslationBridgeStatus;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
+import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
+import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 
 @ExtendWith(MockitoExtension.class)
 public class TranslationBridgeMgmtValidationTest {
@@ -1869,5 +1877,1209 @@ public class TranslationBridgeMgmtValidationTest {
 
 		verify(serviceInstanceIdentifierNormalizer).normalize("TestProvider|testService|1.0.0");
 		verify(serviceInstanceIdentifierValidator).validateServiceInstanceIdentifier("TestProvider|testService|1.0.0");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestOriginNull() {
+		final Throwable ex = assertThrows(IllegalArgumentException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(null, null));
+
+		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestOriginEmpty() {
+		final Throwable ex = assertThrows(IllegalArgumentException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(null, ""));
+
+		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestListNull() {
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(null, "origin"));
+
+		assertEquals("Bridge id list is missing", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestListEmpty() {
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(List.of(), "origin"));
+
+		assertEquals("Bridge id list is missing", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestListContainsNull() {
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(list, "origin"));
+
+		assertEquals("Bridge id list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestListContainsEmptyElement() {
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(List.of(""), "origin"));
+
+		assertEquals("Bridge id list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestIdentifierInvalid() {
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeAbortMgmtRequest(List.of("invalid"), "origin"));
+
+		assertEquals("Bridge identifier is invalid: invalid", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeAbortMgmtRequestOk() {
+		final List<UUID> result = validator.validateAndNormalizeAbortMgmtRequest(List.of("2240efa3-fde4-4f81-a625-04f1234acee7"), "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertEquals(UUID.fromString("2240efa3-fde4-4f81-a625-04f1234acee7"), result.get(0));
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestOriginNull() {
+		final Throwable ex = assertThrows(IllegalArgumentException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(null, null));
+
+		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestOriginEmpty() {
+		final Throwable ex = assertThrows(IllegalArgumentException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(null, ""));
+
+		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestBridgeIdListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Bridge id list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestBridgeIdListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Bridge id list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestBridgeIdInvalid() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				List.of("invalid"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Bridge id is invalid: invalid", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestCreatorListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				List.of("2240efa3-fde4-4f81-a625-04f1234acee7"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Creator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestCreatorListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Creator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestStatusListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				List.of("AdminSystem"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Status list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestStatusListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Status list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestStatusInvalid() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				List.of("INVALID"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Invalid status: INVALID", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestConsumerListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				List.of("USED"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Consumer list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestConsumerListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Consumer list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestProviderListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				List.of("TestConsumer"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Provider list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestProviderListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Provider list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestServiceDefinitionListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				List.of("TestProvider"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Service definition list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestServiceDefinitionListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Service definition list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInterfaceTranslatorListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of("testService"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Interface translator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInterfaceTranslatorListContainsEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Interface translator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestDataModelTranslatorListContainsNull() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+		final List<String> list = new ArrayList<>(1);
+		list.add(null);
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of("TestInterfaceTranslator"),
+				list,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Data model translator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestDataModelTranslatorListEmptyElement() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of(""),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Data model translator list contains null or empty element", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidCreationFrom() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				List.of("TestDataModelTranslator"),
+				"invalid",
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Minimum creation time has an invalid time format", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidCreationTo() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				"invalid",
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Maximum creation time has an invalid time format", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestEmptyCreationInterval() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				"2026-01-12T09:00:00Z",
+				null,
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Empty creation time interval", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidAliveFrom() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				"2026-01-12T12:00:00Z",
+				"invalid",
+				null,
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Minimum alive time has an invalid time format", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidAliveTo() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				null,
+				"2026-01-12T12:00:00Z",
+				"invalid",
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Maximum alive time has an invalid time format", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestEmptyAliveInterval() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T12:00:00Z",
+				"2026-01-12T10:00:00Z",
+				null,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Empty alive time interval", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidMinUsage() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				"2026-01-12T12:00:00Z",
+				-1,
+				null);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Minimum usage number must be a non-negative number", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidMaxUsage() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2026-01-12T10:00:00Z",
+				null,
+				null,
+				-1);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Maximum usage number must be a non-negative number", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestEmptyUsageInterval() {
+		final PageDTO pageDto = new PageDTO(0, 10, "ASC", "serviceDefinition");
+
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDto,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				10,
+				5);
+
+		doNothing().when(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+
+		final ArrowheadException ex = assertThrows(InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("Empty usage interval", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageValidator).validatePageParameter(pageDto, BridgeDetails.ACCEPTABLE_SORT_FIELDS, "origin");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestNoDTOOk() {
+		final PageRequest pageRequest = PageRequest.of(0, 10, Direction.DESC, "header_createdAt");
+		when(pageService.getPageRequest(null, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter")).thenReturn(pageRequest);
+
+		final NormalizedTranslationQueryRequestDTO result = validator.validateAndNormalizeQueryMgmtRequest(null, "origin");
+
+		assertNotNull(result);
+		assertEquals(pageRequest, result.pageRequest());
+		assertNull(result.bridgeIds());
+		assertNull(result.creators());
+		assertNull(result.statuses());
+		assertNull(result.consumers());
+		assertNull(result.providers());
+		assertNull(result.serviceDefinitions());
+		assertNull(result.interfaceTranslators());
+		assertNull(result.dataModelTranslators());
+		assertNull(result.creationFrom());
+		assertNull(result.creationTo());
+		assertNull(result.alivesFrom());
+		assertNull(result.alivesTo());
+		assertNull(result.minUsage());
+		assertNull(result.maxUsage());
+
+		verify(pageService).getPageRequest(null, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestNullPaginationOk() {
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				5,
+				10);
+
+		final PageRequest pageRequest = PageRequest.of(0, 10, Direction.DESC, "header_createdAt");
+		when(pageService.getPageRequest(null, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter")).thenReturn(pageRequest);
+
+		final NormalizedTranslationQueryRequestDTO result = validator.validateAndNormalizeQueryMgmtRequest(dto, "origin");
+
+		assertNotNull(result);
+		assertEquals(pageRequest, result.pageRequest());
+		assertNull(result.bridgeIds());
+		assertNull(result.creators());
+		assertNull(result.statuses());
+		assertNull(result.consumers());
+		assertNull(result.providers());
+		assertNull(result.serviceDefinitions());
+		assertNull(result.interfaceTranslators());
+		assertNull(result.dataModelTranslators());
+		assertNull(result.creationFrom());
+		assertNull(result.creationTo());
+		assertNull(result.alivesFrom());
+		assertNull(result.alivesTo());
+		assertEquals(5, result.minUsage());
+		assertEquals(10, result.maxUsage());
+
+		verify(pageService).getPageRequest(null, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestNullSortFieldOk() {
+		final PageDTO pageDTO = new PageDTO(0, 10, "DESC", null);
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDTO,
+				List.of("2240efa3-fde4-4f81-a625-04f1234acee7"),
+				List.of("Creator"),
+				List.of("USED"),
+				List.of("TestConsumer"),
+				List.of("TestProvider"),
+				List.of("testService"),
+				List.of("TestInterfaceTranslator"),
+				List.of("TestDataModelTranslator"),
+				"2026-01-12T10:00:00Z",
+				"2026-01-12T12:00:00Z",
+				"2026-01-12T12:00:00Z",
+				"2026-01-12T13:00:00Z",
+				null,
+				10);
+
+		final PageRequest pageRequest = PageRequest.of(0, 10, Direction.DESC, "header_createdAt");
+
+		when(pageService.getPageRequest(pageDTO, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter")).thenReturn(pageRequest);
+		when(systemNameNormalizer.normalize("Creator")).thenReturn("Creator");
+		when(systemNameNormalizer.normalize("TestConsumer")).thenReturn("TestConsumer");
+		when(systemNameNormalizer.normalize("TestProvider")).thenReturn("TestProvider");
+		when(serviceDefinitionNameNormalizer.normalize("testService")).thenReturn("testService");
+		when(systemNameNormalizer.normalize("TestInterfaceTranslator")).thenReturn("TestInterfaceTranslator");
+		when(systemNameNormalizer.normalize("TestDataModelTranslator")).thenReturn("TestDataModelTranslator");
+		doNothing().when(systemNameValidator).validateSystemName("Creator");
+		doNothing().when(systemNameValidator).validateSystemName("TestConsumer");
+		doNothing().when(systemNameValidator).validateSystemName("TestProvider");
+		doNothing().when(serviceDefinitionNameValidator).validateServiceDefinitionName("testService");
+		doNothing().when(systemNameValidator).validateSystemName("TestInterfaceTranslator");
+		doNothing().when(systemNameValidator).validateSystemName("TestDataModelTranslator");
+
+		final NormalizedTranslationQueryRequestDTO result = validator.validateAndNormalizeQueryMgmtRequest(dto, "origin");
+
+		assertNotNull(result);
+		assertEquals(pageRequest, result.pageRequest());
+		assertEquals(List.of(UUID.fromString("2240efa3-fde4-4f81-a625-04f1234acee7")), result.bridgeIds());
+		assertEquals(List.of("Creator"), result.creators());
+		assertEquals(List.of(TranslationBridgeStatus.USED), result.statuses());
+		assertEquals(List.of("TestConsumer"), result.consumers());
+		assertEquals(List.of("TestProvider"), result.providers());
+		assertEquals(List.of("testService"), result.serviceDefinitions());
+		assertEquals(List.of("TestInterfaceTranslator"), result.interfaceTranslators());
+		assertEquals(List.of("TestDataModelTranslator"), result.dataModelTranslators());
+		assertEquals(Utilities.parseUTCStringToZonedDateTime("2026-01-12T10:00:00Z"), result.creationFrom());
+		assertEquals(Utilities.parseUTCStringToZonedDateTime("2026-01-12T12:00:00Z"), result.creationTo());
+		assertEquals(Utilities.parseUTCStringToZonedDateTime("2026-01-12T12:00:00Z"), result.alivesFrom());
+		assertEquals(Utilities.parseUTCStringToZonedDateTime("2026-01-12T13:00:00Z"), result.alivesTo());
+		assertNull(result.minUsage());
+		assertEquals(10, result.maxUsage());
+
+		verify(pageService).getPageRequest(pageDTO, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter");
+		verify(systemNameNormalizer).normalize("Creator");
+		verify(systemNameNormalizer).normalize("TestConsumer");
+		verify(systemNameNormalizer).normalize("TestProvider");
+		verify(serviceDefinitionNameNormalizer).normalize("testService");
+		verify(systemNameNormalizer).normalize("TestInterfaceTranslator");
+		verify(systemNameNormalizer).normalize("TestDataModelTranslator");
+		verify(systemNameValidator).validateSystemName("Creator");
+		verify(systemNameValidator).validateSystemName("TestConsumer");
+		verify(systemNameValidator).validateSystemName("TestProvider");
+		verify(serviceDefinitionNameValidator).validateServiceDefinitionName("testService");
+		verify(systemNameValidator).validateSystemName("TestInterfaceTranslator");
+		verify(systemNameValidator).validateSystemName("TestDataModelTranslator");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testValidateAndNormalizeQueryMgmtRequestInvalidParamterException() {
+		final PageDTO pageDTO = new PageDTO(0, 10, "DESC", "createdAt");
+		final PageDTO pageDTO2 = new PageDTO(0, 10, "DESC", "header_createdAt");
+		final TranslationQueryRequestDTO dto = new TranslationQueryRequestDTO(
+				pageDTO,
+				List.of("2240efa3-fde4-4f81-a625-04f1234acee7"),
+				List.of("Cre@tor"),
+				List.of("USED"),
+				List.of("TestConsumer"),
+				List.of("TestProvider"),
+				List.of("testService"),
+				List.of("TestInterfaceTranslator"),
+				List.of("TestDataModelTranslator"),
+				null,
+				null,
+				null,
+				null,
+				5,
+				null);
+
+		final PageRequest pageRequest = PageRequest.of(0, 10, Direction.DESC, "header_createdAt");
+
+		when(pageService.getPageRequest(pageDTO2, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter")).thenReturn(pageRequest);
+		when(systemNameNormalizer.normalize("Cre@tor")).thenReturn("Cre@tor");
+		when(systemNameNormalizer.normalize("TestConsumer")).thenReturn("TestConsumer");
+		when(systemNameNormalizer.normalize("TestProvider")).thenReturn("TestProvider");
+		when(serviceDefinitionNameNormalizer.normalize("testService")).thenReturn("testService");
+		when(systemNameNormalizer.normalize("TestInterfaceTranslator")).thenReturn("TestInterfaceTranslator");
+		when(systemNameNormalizer.normalize("TestDataModelTranslator")).thenReturn("TestDataModelTranslator");
+		doThrow(new InvalidParameterException("test")).when(systemNameValidator).validateSystemName("Cre@tor");
+
+		final ArrowheadException ex = assertThrows(
+				InvalidParameterException.class,
+				() -> validator.validateAndNormalizeQueryMgmtRequest(dto, "origin"));
+
+		assertEquals("test", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(pageService).getPageRequest(pageDTO2, Direction.DESC, BridgeDetails.SORTABLE_FIELDS_BY, BridgeDetails.DEFAULT_SORT_FIELD, "does not matter");
+		verify(systemNameNormalizer).normalize("Cre@tor");
+		verify(systemNameNormalizer).normalize("TestConsumer");
+		verify(systemNameNormalizer).normalize("TestProvider");
+		verify(serviceDefinitionNameNormalizer).normalize("testService");
+		verify(systemNameNormalizer).normalize("TestInterfaceTranslator");
+		verify(systemNameNormalizer).normalize("TestDataModelTranslator");
+		verify(systemNameValidator).validateSystemName("Cre@tor");
 	}
 }
