@@ -106,6 +106,11 @@ public class CoreSystemsDriver {
 				.filter(sysName -> !sysInfo.getBlacklistCheckExcludeList().contains(sysName))
 				.toList();
 
+		if (candidates.isEmpty()) {
+			// no need to check the blacklist
+			return systemNames;
+		}
+
 		try {
 			boolean hasMorePage = false;
 			int pageNumber = 0;
@@ -151,6 +156,7 @@ public class CoreSystemsDriver {
 			throw ex;
 		} catch (final ArrowheadException ex) {
 			logger.error("Blacklist server is not available during the translation bridge process");
+			logger.debug(ex);
 			if (sysInfo.isBlacklistForced()) {
 				logger.error("All the systems have been filtered out, because blacklist is forced");
 				return List.of();
