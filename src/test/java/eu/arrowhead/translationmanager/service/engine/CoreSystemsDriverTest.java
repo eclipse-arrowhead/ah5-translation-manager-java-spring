@@ -18,6 +18,7 @@ package eu.arrowhead.translationmanager.service.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +27,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +37,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
+import eu.arrowhead.common.Constants;
+import eu.arrowhead.common.Utilities;
 import eu.arrowhead.common.exception.ArrowheadException;
 import eu.arrowhead.common.exception.AuthException;
 import eu.arrowhead.common.exception.ExternalServerError;
 import eu.arrowhead.common.exception.ForbiddenException;
 import eu.arrowhead.common.http.ArrowheadHttpService;
+import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtListRequestDTO;
+import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtRequestDTO;
+import eu.arrowhead.dto.AuthorizationTokenMgmtListResponseDTO;
+import eu.arrowhead.dto.AuthorizationTokenResponseDTO;
 import eu.arrowhead.dto.AuthorizationVerifyListRequestDTO;
 import eu.arrowhead.dto.AuthorizationVerifyListResponseDTO;
 import eu.arrowhead.dto.AuthorizationVerifyRequestDTO;
@@ -48,12 +62,18 @@ import eu.arrowhead.dto.AuthorizationVerifyResponseDTO;
 import eu.arrowhead.dto.BlacklistEntryDTO;
 import eu.arrowhead.dto.BlacklistEntryListResponseDTO;
 import eu.arrowhead.dto.BlacklistQueryRequestDTO;
+import eu.arrowhead.dto.MetadataRequirementDTO;
 import eu.arrowhead.dto.ServiceDefinitionResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
+import eu.arrowhead.dto.ServiceInstanceListResponseDTO;
+import eu.arrowhead.dto.ServiceInstanceLookupRequestDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
 import eu.arrowhead.dto.SystemResponseDTO;
 import eu.arrowhead.dto.enums.AuthorizationTargetType;
+import eu.arrowhead.dto.enums.AuthorizationTokenType;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
+import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
+import eu.arrowhead.translationmanager.service.dto.TranslationDiscoveryModel;
 
 @ExtendWith(MockitoExtension.class)
 public class CoreSystemsDriverTest {
@@ -428,5 +448,461 @@ public class CoreSystemsDriverTest {
 		final Map<String, String> result = driver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(dto));
 
 		assertTrue(result.isEmpty());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForManagerToInterfaceBridgeManagementServiceOk() {
+		final ServiceInstanceInterfaceResponseDTO intf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"USAGE_LIMITED_TOKEN_AUTH",
+				Map.of());
+
+		final ServiceInstanceResponseDTO dto = new ServiceInstanceResponseDTO(
+				"InterfaceTranslator|interfaceBridgeManagement|1.0.0",
+				new SystemResponseDTO("InterfaceTranslator", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("interfaceBridgeManagement", null, null),
+				"1.0.0",
+				null,
+				null,
+				List.of(intf),
+				null,
+				null);
+
+		final MultiValueMap<String, String> queryMap = new LinkedMultiValueMap<>(Map.of(Constants.UNBOUND, List.of(Boolean.TRUE.toString())));
+
+		final AuthorizationTokenResponseDTO responseEntry = new AuthorizationTokenResponseDTO(
+				AuthorizationTokenType.USAGE_LIMITED_TOKEN,
+				"variant",
+				"token",
+				null,
+				"TranslationManager",
+				"LOCAL",
+				"TranslationManager",
+				"InterfaceTranslator",
+				AuthorizationTargetType.SERVICE_DEF,
+				"interfaceBridgeManagement",
+				null,
+				null,
+				100,
+				100,
+				null);
+
+		when(sysInfo.getSystemName()).thenReturn("TranslationManager");
+		when(ahHttpService.consumeService(
+				eq("authorizationTokenManagement"),
+				eq("generate-tokens"),
+				eq("ConsumerAuthorization"),
+				eq(AuthorizationTokenMgmtListResponseDTO.class),
+				any(AuthorizationTokenGenerationMgmtListRequestDTO.class),
+				eq(queryMap))).thenReturn(new AuthorizationTokenMgmtListResponseDTO(List.of(responseEntry), 1));
+
+		final Map<String, String> result = driver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(dto));
+
+		assertNotNull(result);
+		assertTrue(result.containsKey("InterfaceTranslator"));
+		assertEquals("token", result.get("InterfaceTranslator"));
+
+		verify(sysInfo).getSystemName();
+		verify(ahHttpService).consumeService(
+				eq("authorizationTokenManagement"),
+				eq("generate-tokens"),
+				eq("ConsumerAuthorization"),
+				eq(AuthorizationTokenMgmtListResponseDTO.class),
+				any(AuthorizationTokenGenerationMgmtListRequestDTO.class),
+				eq(queryMap));
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationPolicyNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation(null, null, null, null, null));
+
+		assertEquals("policy is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationPolicyEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("", null, null, null, null));
+
+		assertEquals("policy is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationInterfaceTranslatorNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", null, null, null, null));
+
+		assertEquals("interfaceTranslator is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationInterfaceTranslatorEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "", null, null, null));
+
+		assertEquals("interfaceTranslator is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationTargetProviderNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", null, null, null));
+
+		assertEquals("targetProvider is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationTargetProviderEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", "", null, null));
+
+		assertEquals("targetProvider is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationServiceDefinitionNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", "TestProvider", null, null));
+
+		assertEquals("serviceDefinition is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationServiceDefinitionEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", "TestProvider", "", null));
+
+		assertEquals("serviceDefinition is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationOperationNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", "TestProvider", "testService", null));
+
+		assertEquals("operation is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationOperationEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.generateTokenForInterfaceTranslatorToTargetOperation("USAGE_LIMITED_TOKEN_AUTH", "InterfaceTranslator", "TestProvider", "testService", ""));
+
+		assertEquals("operation is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGenerateTokenForInterfaceTranslatorToTargetOperationOk() {
+		final AuthorizationTokenGenerationMgmtRequestDTO dto = new AuthorizationTokenGenerationMgmtRequestDTO(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"SERVICE_DEF",
+				"LOCAL",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				null,
+				null);
+		final AuthorizationTokenGenerationMgmtListRequestDTO payload = new AuthorizationTokenGenerationMgmtListRequestDTO(List.of(dto));
+
+		final MultiValueMap<String, String> queryMap = new LinkedMultiValueMap<>(Map.of(Constants.UNBOUND, List.of(Boolean.TRUE.toString())));
+
+		final AuthorizationTokenResponseDTO responseEntry = new AuthorizationTokenResponseDTO(
+				AuthorizationTokenType.USAGE_LIMITED_TOKEN,
+				"variant",
+				"token",
+				null,
+				"TranslationManager",
+				"LOCAL",
+				"InterfaceTranslator",
+				"TestProvider",
+				AuthorizationTargetType.SERVICE_DEF,
+				"testService",
+				"test-operation",
+				null,
+				10,
+				10,
+				null);
+
+		when(ahHttpService.consumeService(
+				"authorizationTokenManagement",
+				"generate-tokens",
+				"ConsumerAuthorization",
+				AuthorizationTokenMgmtListResponseDTO.class,
+				payload,
+				queryMap)).thenReturn(new AuthorizationTokenMgmtListResponseDTO(List.of(responseEntry), 1));
+
+		final AuthorizationTokenResponseDTO result = driver.generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation");
+
+		assertEquals(responseEntry, result);
+
+		verify(ahHttpService).consumeService(
+				"authorizationTokenManagement",
+				"generate-tokens",
+				"ConsumerAuthorization",
+				AuthorizationTokenMgmtListResponseDTO.class,
+				payload,
+				queryMap);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesRequirementsListNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(null, null));
+
+		assertEquals("inputInterfaceRequirements list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesRequirementsListEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(List.of(), null));
+
+		assertEquals("inputInterfaceRequirements list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesRequirementsListContainsNull() {
+		final List<String> reqList = new ArrayList<>(1);
+		reqList.add(null);
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(reqList, null));
+
+		assertEquals("inputInterfaceRequirements list contains null or empty element", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesRequirementsListContainsEmptyElement() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(List.of(""), null));
+
+		assertEquals("inputInterfaceRequirements list contains null or empty element", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesTargetsNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(List.of("req"), null));
+
+		assertEquals("targets list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesTargetsEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(List.of("req"), List.of()));
+
+		assertEquals("targets list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesTargetsContainsNull() {
+		final List<NormalizedServiceInstanceDTO> list = new ArrayList<>(1);
+		list.add(null);
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectInterfaceTranslatorCandidates(List.of("req"), list));
+
+		assertEquals("targets list contains null element", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesTargetsOk1() {
+		final ServiceInstanceInterfaceResponseDTO intf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_mqtt",
+				"tcp",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final NormalizedServiceInstanceDTO target = new NormalizedServiceInstanceDTO(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				List.of(intf));
+
+		final MetadataRequirementDTO req = new MetadataRequirementDTO();
+		req.put("interfaceBridge.from", Map.of("op", "CONTAINS_ANY", "value", List.of("generic_http")));
+		req.put("interfaceBridge.to", Map.of("op", "IN", "value", List.of("generic_mqtt")));
+
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("interfaceBridgeManagement"),
+				null,
+				null,
+				List.of(req),
+				null,
+				List.of("generic_http"),
+				null,
+				null);
+
+		final ServiceInstanceResponseDTO response = new ServiceInstanceResponseDTO("InterfaceTranslator|interfaceBridgeManagement|1.0.0", null, null, null, null, req, null, null, null);
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(new ServiceInstanceListResponseDTO(List.of(response), 1));
+
+		final List<ServiceInstanceResponseDTO> result = driver.collectInterfaceTranslatorCandidates(List.of("generic_http"), List.of(target));
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertEquals("InterfaceTranslator|interfaceBridgeManagement|1.0.0", result.get(0).instanceId());
+
+		verify(sysInfo).isSslEnabled();
+		verify(ahHttpService).consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testCollectInterfaceTranslatorCandidatesTargetsOk2() {
+		final ServiceInstanceInterfaceResponseDTO intf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_mqtt",
+				"tcp",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final NormalizedServiceInstanceDTO target = new NormalizedServiceInstanceDTO(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				List.of(intf));
+
+		final MetadataRequirementDTO req = new MetadataRequirementDTO();
+		req.put("interfaceBridge.from", Map.of("op", "CONTAINS_ANY", "value", List.of("generic_http")));
+		req.put("interfaceBridge.to", Map.of("op", "IN", "value", List.of("generic_mqtt")));
+
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("interfaceBridgeManagement"),
+				null,
+				"2026-1-16T10:05:00Z",
+				List.of(req),
+				null,
+				List.of("generic_https"),
+				null,
+				null);
+
+		final ServiceInstanceResponseDTO response = new ServiceInstanceResponseDTO("InterfaceTranslator|interfaceBridgeManagement|1.0.0", null, null, null, null, req, null, null, null);
+
+		when(sysInfo.isSslEnabled()).thenReturn(true);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(new ServiceInstanceListResponseDTO(List.of(response), 1));
+
+		ReflectionTestUtils.setField(driver, "translatorServiceMinAvailability", 5);
+
+		try (MockedStatic<Utilities> staticMock = Mockito.mockStatic(Utilities.class)) {
+			final ZonedDateTime time = ZonedDateTime.of(2026, 1, 16, 10, 0, 0, 0, ZoneId.of(Constants.UTC));
+			staticMock.when(() -> Utilities.utcNow()).thenReturn(time);
+			staticMock.when(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class))).thenReturn("2026-1-16T10:05:00Z");
+
+			final List<ServiceInstanceResponseDTO> result = driver.collectInterfaceTranslatorCandidates(List.of("generic_http"), List.of(target));
+
+			assertNotNull(result);
+			assertEquals(1, result.size());
+			assertEquals("InterfaceTranslator|interfaceBridgeManagement|1.0.0", result.get(0).instanceId());
+			staticMock.verify(() -> Utilities.utcNow());
+			staticMock.verify(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class)));
+			verify(sysInfo).isSslEnabled();
+
+			verify(ahHttpService).consumeService(
+					"serviceDiscovery",
+					"lookup",
+					"ServiceRegistry",
+					ServiceInstanceListResponseDTO.class,
+					payload);
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectDataModelTranslatorCandidatesModelsNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectDataModelTranslatorCandidates(null));
+
+		assertEquals("models list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectDataModelTranslatorCandidatesModelsEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectDataModelTranslatorCandidates(List.of()));
+
+		assertEquals("models list is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectDataModelTranslatorCandidatesModelsContainsNull() {
+		final List<TranslationDiscoveryModel> list = new ArrayList<>(1);
+		list.add(null);
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.collectDataModelTranslatorCandidates(list));
+
+		assertEquals("models list contains null element", ex.getMessage());
 	}
 }
