@@ -51,6 +51,7 @@ import eu.arrowhead.common.exception.AuthException;
 import eu.arrowhead.common.exception.ExternalServerError;
 import eu.arrowhead.common.exception.ForbiddenException;
 import eu.arrowhead.common.http.ArrowheadHttpService;
+import eu.arrowhead.common.http.filter.authentication.AuthenticationPolicy;
 import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtListRequestDTO;
 import eu.arrowhead.dto.AuthorizationTokenGenerationMgmtRequestDTO;
 import eu.arrowhead.dto.AuthorizationTokenMgmtListResponseDTO;
@@ -233,6 +234,7 @@ public class CoreSystemsDriverTest {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
 	@Test
 	public void testFilterOutBlacklistedSystemsOk() {
 		final BlacklistEntryDTO entry1 = new BlacklistEntryDTO("BadSystem", null, null, null, null, null, null, true);
@@ -860,10 +862,10 @@ public class CoreSystemsDriverTest {
 			assertNotNull(result);
 			assertEquals(1, result.size());
 			assertEquals("InterfaceTranslator|interfaceBridgeManagement|1.0.0", result.get(0).instanceId());
+
+			verify(sysInfo).isSslEnabled();
 			staticMock.verify(() -> Utilities.utcNow());
 			staticMock.verify(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class)));
-			verify(sysInfo).isSslEnabled();
-
 			verify(ahHttpService).consumeService(
 					"serviceDiscovery",
 					"lookup",
@@ -904,5 +906,146 @@ public class CoreSystemsDriverTest {
 				() -> driver.collectDataModelTranslatorCandidates(list));
 
 		assertEquals("models list contains null element", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectDataModelTranslatorCandidatesOk1() {
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				"TestConsumer",
+				"testXml",
+				null);
+		model.setTargetInputDataModelId("testJson");
+
+		final MetadataRequirementDTO req = new MetadataRequirementDTO();
+		req.put("dataModelIds", Map.of("op", "CONTAINS", "value", List.of("testXml", "testJson")));
+
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("dataModelTranslation"),
+				null,
+				null,
+				List.of(req),
+				null,
+				List.of("generic_http"),
+				null,
+				List.of("NONE"));
+
+		final ServiceInstanceResponseDTO response = new ServiceInstanceResponseDTO("DataModelTranslator|dataModelTranslation|1.0.0", null, null, null, null, req, null, null, null);
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(sysInfo.getAuthenticationPolicy()).thenReturn(AuthenticationPolicy.DECLARED);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(new ServiceInstanceListResponseDTO(List.of(response), 1));
+
+		final List<ServiceInstanceResponseDTO> result = driver.collectDataModelTranslatorCandidates(List.of(model));
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertEquals("DataModelTranslator|dataModelTranslation|1.0.0", result.get(0).instanceId());
+
+		verify(sysInfo).isSslEnabled();
+		verify(sysInfo).getAuthenticationPolicy();
+		verify(ahHttpService).consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testCollectDataModelTranslatorCandidatesOk2() {
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				"TestConsumer",
+				null,
+				"testXml");
+		model.setTargetOutputDataModelId("testJson");
+
+		final MetadataRequirementDTO req = new MetadataRequirementDTO();
+		req.put("dataModelIds", Map.of("op", "CONTAINS", "value", List.of("testJson", "testXml")));
+
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("dataModelTranslation"),
+				null,
+				"2026-1-16T10:05:00Z",
+				List.of(req),
+				null,
+				List.of("generic_https"),
+				null,
+				List.of("CERT_AUTH", "NONE"));
+
+		final ServiceInstanceResponseDTO response = new ServiceInstanceResponseDTO("DataModelTranslator|dataModelTranslation|1.0.0", null, null, null, null, req, null, null, null);
+
+		when(sysInfo.isSslEnabled()).thenReturn(true);
+		when(sysInfo.getAuthenticationPolicy()).thenReturn(AuthenticationPolicy.CERTIFICATE);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(new ServiceInstanceListResponseDTO(List.of(response), 1));
+
+		ReflectionTestUtils.setField(driver, "translatorServiceMinAvailability", 5);
+
+		try (MockedStatic<Utilities> staticMock = Mockito.mockStatic(Utilities.class)) {
+			final ZonedDateTime time = ZonedDateTime.of(2026, 1, 16, 10, 0, 0, 0, ZoneId.of(Constants.UTC));
+			staticMock.when(() -> Utilities.utcNow()).thenReturn(time);
+			staticMock.when(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class))).thenReturn("2026-1-16T10:05:00Z");
+
+			final List<ServiceInstanceResponseDTO> result = driver.collectDataModelTranslatorCandidates(List.of(model));
+
+			assertNotNull(result);
+			assertEquals(1, result.size());
+			assertEquals("DataModelTranslator|dataModelTranslation|1.0.0", result.get(0).instanceId());
+
+			verify(sysInfo).isSslEnabled();
+			verify(sysInfo).getAuthenticationPolicy();
+			staticMock.verify(() -> Utilities.utcNow());
+			staticMock.verify(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class)));
+			verify(ahHttpService).consumeService(
+					"serviceDiscovery",
+					"lookup",
+					"ServiceRegistry",
+					ServiceInstanceListResponseDTO.class,
+					payload);
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGetConfigurationForSystemNullInput() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.getConfigurationForSystem(null));
+
+		assertEquals("system name is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGetConfigurationForSystemEmptyInput() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.getConfigurationForSystem(""));
+
+		assertEquals("system name is missing", ex.getMessage());
 	}
 }
