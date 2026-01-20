@@ -16,6 +16,7 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service.engine;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -911,5 +912,170 @@ public class InterfaceTranslatorDriverTest {
 				payload,
 				null,
 				Map.of());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testAbortBridgeIdNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.abortBridge(null, null, null));
+
+		assertEquals("bridgeId is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testAbortBridgePropertiesNull() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.abortBridge(bridgeId, null, null));
+
+		assertEquals("interfaceProperties is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testAbortBridgePropertiesEmpty() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> driver.abortBridge(bridgeId, Map.of(), null));
+
+		assertEquals("interfaceProperties is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testAbortBridgeExceptionDuringWSCall() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final Map<String, Object> properties = Map.of("accessAddresses", List.of("localhost"), "accessPort", 12345, "basePath", "/test");
+
+		final UriComponents uri = HttpUtilities.createURI("https", "localhost", 12345, "/test/abort-bridge" + "/" + bridgeId.toString());
+
+		when(sysInfo.isSslEnabled()).thenReturn(true);
+		when(httpService.sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of("Authorization", "Bearer token"),
+				Void.TYPE)).thenThrow(ArrowheadException.class);
+
+		assertDoesNotThrow(() -> driver.abortBridge(bridgeId, properties, "token"));
+
+		verify(sysInfo).isSslEnabled();
+		verify(httpService).sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of("Authorization", "Bearer token"),
+				Void.TYPE);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testAbortBridgeOk1() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final Map<String, Object> properties = Map.of("accessAddresses", List.of("localhost"), "accessPort", 12345, "basePath", "/test", "operations", "string");
+
+		final UriComponents uri = HttpUtilities.createURI("http", "localhost", 12345, "/test/abort-bridge" + "/" + bridgeId.toString());
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(httpService.sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE)).thenReturn(null);
+
+		assertDoesNotThrow(() -> driver.abortBridge(bridgeId, properties, null));
+
+		verify(sysInfo).isSslEnabled();
+		verify(httpService).sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testAbortBridgeOk2() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final Map<String, Object> properties = Map.of("accessAddresses", List.of("localhost"), "accessPort", 12345, "basePath", "/test", "operations", Map.of());
+
+		final UriComponents uri = HttpUtilities.createURI("http", "localhost", 12345, "/test/abort-bridge" + "/" + bridgeId.toString());
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(httpService.sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE)).thenReturn(null);
+
+		assertDoesNotThrow(() -> driver.abortBridge(bridgeId, properties, null));
+
+		verify(sysInfo).isSslEnabled();
+		verify(httpService).sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testAbortBridgeOk3() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final Map<String, Object> properties = Map.of("accessAddresses", List.of("localhost"), "accessPort", 12345, "basePath", "/test", "operations", Map.of("abort-bridge", "notAModel"));
+
+		final UriComponents uri = HttpUtilities.createURI("http", "localhost", 12345, "/test/abort-bridge" + "/" + bridgeId.toString());
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(httpService.sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE)).thenReturn(null);
+
+		assertDoesNotThrow(() -> driver.abortBridge(bridgeId, properties, null));
+
+		verify(sysInfo).isSslEnabled();
+		verify(httpService).sendRequest(
+				uri,
+				HttpMethod.DELETE,
+				Map.of(),
+				Void.TYPE);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testAbortBridgeOk4() {
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final HttpOperationModel opModel = new HttpOperationModel("/abort", "GET");
+		final Map<String, Object> properties = Map.of("accessAddresses", List.of("localhost"), "accessPort", 12345, "basePath", "/test", "operations", Map.of("abort-bridge", opModel));
+
+		final UriComponents uri = HttpUtilities.createURI("http", "localhost", 12345, "/test/abort" + "/" + bridgeId.toString());
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(httpService.sendRequest(
+				uri,
+				HttpMethod.GET,
+				Map.of(),
+				Void.TYPE)).thenReturn(null);
+
+		assertDoesNotThrow(() -> driver.abortBridge(bridgeId, properties, null));
+
+		verify(sysInfo).isSslEnabled();
+		verify(httpService).sendRequest(
+				uri,
+				HttpMethod.GET,
+				Map.of(),
+				Void.TYPE);
 	}
 }

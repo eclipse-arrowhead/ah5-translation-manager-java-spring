@@ -118,7 +118,7 @@ public class TranslatorBridgeEngine {
 		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false)
 				&& csDriver.isBlacklisted(dto.consumer())) {
 			// consumer is on the blacklist
-			throw new ForbiddenException(dto.consumer() + " system is blacklisted");
+			throw new ForbiddenException(dto.consumer() + " system is blacklisted", origin);
 		}
 
 		try {
@@ -489,7 +489,7 @@ public class TranslatorBridgeEngine {
 					intf.protocol(),
 					intf.policy(),
 					normalizedProps);
-		} catch (final InvalidParameterException ex) {
+		} catch (final InvalidParameterException __) {
 			logger.debug("Invalid data model indentifier in one of the candidates");
 			return null;
 		}
