@@ -137,7 +137,7 @@ public class TranslatorBridgeEngine {
 			// create tokens (if necessary) for using interface translator's translationBridgeManagement service
 			final Map<String, String> tokens = csDriver.generateTokenForManagerToInterfaceBridgeManagementService(appropriateInterfaceTranslatorCandidates);
 
-			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains a interface translator and a list of target interfaces that have
+			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains an interface translator and a list of target interfaces that have
 			// every information to make possible to communicate with the target by the interface translator
 			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateInterfaceTranslators = calculateInterfaceTranslatorMap(
 					appropriateInterfaceTranslatorCandidates,
