@@ -667,7 +667,7 @@ public class TranslatorBridgeEngineTest {
 		verify(sysInfo).getSystemName();
 		verify(csDriver).filterOutProvidersBecauseOfUnauthorization(List.of("InterfaceTranslator"), "TranslationManager", "interfaceBridgeManagement", null);
 	}
-	
+
 	//-------------------------------------------------------------------------------------------------
 	@Test
 	public void testDoDiscoveryIncompatibleInterfaceTranslatorForTarget() {
@@ -736,5 +736,143 @@ public class TranslatorBridgeEngineTest {
 		verify(csDriver).filterOutProvidersBecauseOfUnauthorization(List.of("InterfaceTranslator"), "TranslationManager", "interfaceBridgeManagement", null);
 		verify(csDriver).generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator));
 		verify(itDriver).filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoDiscoveryEmptyModels() {
+		final ServiceInstanceInterfaceResponseDTO targetIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("dataModels", Map.of("test-operation", Map.of("input", "testXml", "output", "testXml"))));
+
+		final List<NormalizedServiceInstanceDTO> candidates = List.of(new NormalizedServiceInstanceDTO("TestProvider|testService|1.0.0", "TestProvider", "testService", List.of(targetIntf)));
+		final NormalizedTranslationDiscoveryRequestDTO dto = new NormalizedTranslationDiscoveryRequestDTO(
+				"TestCreator",
+				candidates,
+				"TestConsumer",
+				"test-operation",
+				List.of("generic_mqtt"),
+				"testJson",
+				"testJson");
+
+		final Map<TranslationDiscoveryFlag, Boolean> flags = Map.of(
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false);
+
+		final ServiceInstanceInterfaceResponseDTO iTranslatorIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final ServiceInstanceResponseDTO interfaceTranslator = new ServiceInstanceResponseDTO(
+				"InterfaceTranslator|interfaceBridgeManagement|1.0.0",
+				new SystemResponseDTO("InterfaceTranslator", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("interfaceBridgeManagement", null, null),
+				"1.0.0",
+				null,
+				Map.of("interfaceBridge", Map.of("to", "generic_http")),
+				List.of(iTranslatorIntf),
+				null,
+				null);
+
+		when(dataModelIdentifierNormalizer.normalize("testXml")).thenReturn("testXml");
+		doNothing().when(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+		when(csDriver.collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates)).thenReturn(List.of(interfaceTranslator));
+		when(csDriver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator))).thenReturn(Map.of());
+		when(itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates)).thenReturn(candidates);
+		when(interfaceTranslatorMatchmaker.doMatchmaking(List.of(interfaceTranslator), Map.of())).thenReturn(null);
+
+		final TranslationDiscoveryResponseDTO result = engine.doDiscovery(dto, flags, "origin");
+
+		assertNotNull(result);
+		assertNull(result.bridgeId());
+		assertTrue(result.candidates().isEmpty());
+
+		verify(csDriver, never()).isBlacklisted("TestConsumer");
+		verify(dataModelIdentifierNormalizer, times(2)).normalize("testXml");
+		verify(dataModelIdentifierValidator, times(2)).validateDataModelIdentifier("testXml");
+		verify(csDriver, never()).filterOutBlacklistedSystems(List.of("TestProvider"));
+		verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("TestProvider"), "TestConsumer", "testService", "test-operation");
+		verify(csDriver).collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates);
+		verify(csDriver, never()).filterOutBlacklistedSystems(List.of("InterfaceTranslator"));
+		verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("InterfaceTranslator"), "TranslationManager", "interfaceBridgeManagement", null);
+		verify(csDriver).generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator));
+		verify(itDriver).filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates);
+		verify(interfaceTranslatorMatchmaker).doMatchmaking(List.of(interfaceTranslator), Map.of());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoDiscoveryEmptyModels2() {
+		final ServiceInstanceInterfaceResponseDTO targetIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("dataModels", Map.of("test-operation", Map.of("input", "testXml", "output", "testXml"))));
+
+		final List<NormalizedServiceInstanceDTO> candidates = List.of(new NormalizedServiceInstanceDTO("TestProvider|testService|1.0.0", "TestProvider", "testService", List.of(targetIntf)));
+		final NormalizedTranslationDiscoveryRequestDTO dto = new NormalizedTranslationDiscoveryRequestDTO(
+				"TestCreator",
+				candidates,
+				"TestConsumer",
+				"test-operation",
+				List.of("generic_mqtt"),
+				"testJson",
+				"testJson");
+
+		final Map<TranslationDiscoveryFlag, Boolean> flags = Map.of(
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false);
+
+		final ServiceInstanceInterfaceResponseDTO iTranslatorIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final ServiceInstanceResponseDTO interfaceTranslator = new ServiceInstanceResponseDTO(
+				"InterfaceTranslator|interfaceBridgeManagement|1.0.0",
+				new SystemResponseDTO("InterfaceTranslator", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("interfaceBridgeManagement", null, null),
+				"1.0.0",
+				null,
+				Map.of("interfaceBridge", Map.of("to", "generic_http", "from", List.of("some_problem"))),
+				List.of(iTranslatorIntf),
+				null,
+				null);
+
+		when(dataModelIdentifierNormalizer.normalize("testXml")).thenReturn("testXml");
+		doNothing().when(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+		when(csDriver.collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates)).thenReturn(List.of(interfaceTranslator));
+		when(csDriver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator))).thenReturn(Map.of());
+		when(itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates)).thenReturn(candidates);
+		when(interfaceTranslatorMatchmaker.doMatchmaking(List.of(interfaceTranslator), Map.of())).thenReturn(interfaceTranslator);
+
+		final TranslationDiscoveryResponseDTO result = engine.doDiscovery(dto, flags, "origin");
+
+		assertNotNull(result);
+		assertNull(result.bridgeId());
+		assertTrue(result.candidates().isEmpty());
+
+		verify(csDriver, never()).isBlacklisted("TestConsumer");
+		verify(dataModelIdentifierNormalizer, times(2)).normalize("testXml");
+		verify(dataModelIdentifierValidator, times(2)).validateDataModelIdentifier("testXml");
+		verify(csDriver, never()).filterOutBlacklistedSystems(List.of("TestProvider"));
+		verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("TestProvider"), "TestConsumer", "testService", "test-operation");
+		verify(csDriver).collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates);
+		verify(csDriver, never()).filterOutBlacklistedSystems(List.of("InterfaceTranslator"));
+		verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("InterfaceTranslator"), "TranslationManager", "interfaceBridgeManagement", null);
+		verify(csDriver).generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator));
+		verify(itDriver).filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates);
+		verify(interfaceTranslatorMatchmaker).doMatchmaking(List.of(interfaceTranslator), Map.of());
 	}
 }
