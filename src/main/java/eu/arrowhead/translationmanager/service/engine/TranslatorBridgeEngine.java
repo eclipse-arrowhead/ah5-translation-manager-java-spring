@@ -649,7 +649,7 @@ public class TranslatorBridgeEngine {
 				if (dto.inputDataModelId() != null) {
 					final String targetInputDataModelId = getTargetDataModelId(toInterfaceProperties, dto.operation(), true);
 					if (targetInputDataModelId == null) {
-						// something is not OK in the target's data model specification
+						// something is not OK in the target's data model specification (should not happen, already checked in a previous method)
 						throw new InvalidParameterException("Input data model identifier is not found in target " + c.instanceId() + " and interface " + model.getToInterfaceTemplate());
 					}
 					model.setTargetInputDataModelId(targetInputDataModelId);
@@ -658,7 +658,7 @@ public class TranslatorBridgeEngine {
 				if (dto.outputDataModelId() != null) {
 					final String targetOutputDataModelId = getTargetDataModelId(toInterfaceProperties, dto.operation(), false);
 					if (targetOutputDataModelId == null) {
-						// something is not OK in the target's data model specification
+						// something is not OK in the target's data model specification (should not happen, already checked in a previous method)
 						throw new InvalidParameterException("Output data model identifier is not found in target " + c.instanceId() + " and interface " + model.getToInterfaceTemplate());
 					}
 					model.setTargetOutputDataModelId(targetOutputDataModelId);
@@ -852,22 +852,24 @@ public class TranslatorBridgeEngine {
 			return null;
 		}
 
-		// authorization check that the interface translator have access to data model translators' service
-		final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
-				relatedTranslators.stream().map(c -> c.provider().name()).toList(),
-				model.getInterfaceTranslator(),
-				Constants.SERVICE_DEF_DATA_MODEL_TRANSLATION,
-				null);
+		if (authorizationCheck) {
+			// authorization check that the interface translator have access to data model translators' service
+			final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
+					relatedTranslators.stream().map(c -> c.provider().name()).toList(),
+					model.getInterfaceTranslator(),
+					Constants.SERVICE_DEF_DATA_MODEL_TRANSLATION,
+					null);
 
-		if (allowedTranslators.isEmpty()) {
-			logger.warn("Check the data model translators in the local cloud, because some of them are not accessible by the interface translator {}", model.getInterfaceTranslator());
-			return null;
+			if (allowedTranslators.isEmpty()) {
+				logger.warn("Check the data model translators in the local cloud, because some of them are not accessible by the interface translator {}", model.getInterfaceTranslator());
+				return null;
+			}
+
+			relatedTranslators = relatedTranslators
+					.stream()
+					.filter(c -> allowedTranslators.contains(c.provider().name()))
+					.toList();
 		}
-
-		relatedTranslators = relatedTranslators
-				.stream()
-				.filter(c -> allowedTranslators.contains(c.provider().name()))
-				.toList();
 
 		return dataModelTranslatorMatchmaker.doMatchmaking(relatedTranslators, Map.of());
 	}
