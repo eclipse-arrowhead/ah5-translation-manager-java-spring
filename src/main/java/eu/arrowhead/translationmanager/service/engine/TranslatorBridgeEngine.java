@@ -187,15 +187,15 @@ public class TranslatorBridgeEngine {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public TranslationNegotiationResponseDTO doNegotiation(final UUID bridgeId, final String normalizedTargetInstanceId, final String origin) {
+	public TranslationNegotiationResponseDTO doNegotiation(final UUID bridgeId, final String targetInstanceId, final String origin) {
 		logger.debug("doNegotiation started...");
 		Assert.notNull(bridgeId, "bridgeId is null");
-		Assert.isTrue(!Utilities.isEmpty(normalizedTargetInstanceId), "normalizedTargetInstanceId is empty");
+		Assert.isTrue(!Utilities.isEmpty(targetInstanceId), "targetInstanceId is empty");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		boolean storeException = false;
 		try {
-			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(bridgeId, normalizedTargetInstanceId);
+			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(bridgeId, targetInstanceId);
 			storeException = true;
 			final TranslationDiscoveryModel model = bridgePair.getFirst();
 			final BridgeDetails detailsRecord = bridgePair.getSecond();
@@ -283,9 +283,8 @@ public class TranslatorBridgeEngine {
 
 			throw new InvalidParameterException(ex.getMessage(), origin);
 		} catch (final ExternalServerError ex) {
-			if (storeException) {
-				dbService.storeBridgeProblem(bridgeId, ex.getMessage());
-			}
+			// only thrown after storeException is set to true
+			dbService.storeBridgeProblem(bridgeId, ex.getMessage());
 
 			throw new ExternalServerError(ex.getMessage(), origin);
 		} catch (final Exception ex) {
