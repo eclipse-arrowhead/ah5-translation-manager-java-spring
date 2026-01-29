@@ -253,8 +253,6 @@ public class TranslatorBridgeEngine {
 				if (!TranslationManagerConstants.POLICY_TRANSLATION_BRIDGE_TOKEN_AUTH
 						.equals(bridgeResult.getFirst().get().policy().trim().toUpperCase())) {
 					// policy is not match with the expected
-
-					dbService.storeBridgeProblem(bridgeId, "Invalid policy from interface provider: " + bridgeResult.getFirst().get().policy());
 					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties(), model.getInterfaceTranslatorToken());
 
 					throw new ExternalServerError("Interface provider returns with invalid data", origin);
@@ -945,7 +943,7 @@ public class TranslatorBridgeEngine {
 					initResponse.interfaceProperties(),
 					null))); // settings should be handled by the factory
 		} else {
-			outputDataModelTranslatorSettings = getCustomConfiguration(model.getInputDataModelTranslator());
+			outputDataModelTranslatorSettings = getCustomConfiguration(model.getOutputDataModelTranslator());
 			detailsRecord.setResultDmTranslatorData(Utilities.toJson(new TranslationDataModelTranslationDataDescriptorDTO(
 					model.getTargetOutputDataModelId(),
 					model.getOutputDataModelIdRequirement(),

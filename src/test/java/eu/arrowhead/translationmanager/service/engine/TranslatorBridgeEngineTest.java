@@ -30,9 +30,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -53,15 +55,19 @@ import eu.arrowhead.common.exception.InternalServerError;
 import eu.arrowhead.common.exception.InvalidParameterException;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierNormalizer;
 import eu.arrowhead.common.service.validation.name.DataModelIdentifierValidator;
+import eu.arrowhead.dto.AuthorizationTokenResponseDTO;
 import eu.arrowhead.dto.ServiceDefinitionResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceInterfaceResponseDTO;
 import eu.arrowhead.dto.ServiceInstanceResponseDTO;
 import eu.arrowhead.dto.SystemResponseDTO;
 import eu.arrowhead.dto.TranslationBridgeCandidateDTO;
+import eu.arrowhead.dto.TranslationDataModelTranslatorInitializationResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
+import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
+import eu.arrowhead.translationmanager.jpa.entity.BridgeHeader;
 import eu.arrowhead.translationmanager.jpa.service.BridgeDbService;
 import eu.arrowhead.translationmanager.service.dto.DTOConverter;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
@@ -1994,5 +2000,534 @@ public class TranslatorBridgeEngineTest {
 		verify(sysInfo).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
 		verify(dbService).storeBridgeProblem(bridgeId, "test");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationBridgeIsInEndState() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(false);
+		when(dbService.updateDetailsRecord(details)).thenReturn(true);
+		doNothing().when(dbService).storeBridgeProblem(bridgeId, "Bridge is already in an end state");
+
+		final ArrowheadException ex = assertThrows(
+				InvalidParameterException.class,
+				() -> engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin"));
+
+		assertEquals("Bridge is already in an end state", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo).isCustomConfigurationEnabled();
+		verify(csDriver, never()).getConfigurationForSystem("InterfaceTranslator");
+		verify(dbService).updateDetailsRecord(details);
+		verify(dbService).storeBridgeProblem(bridgeId, "Bridge is already in an end state");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationErrorInBridgeInitialization() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setInputDataModelIdRequirement("testJson");
+		model.setOutputDataModelIdRequirement("testJson2");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model.setInputDataModelTranslatorFactory(false);
+		model.setInputDataModelTranslator("DataModelTranslator");
+		model.setTargetInputDataModelId("testXml");
+		model.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model.setOutputDataModelTranslatorFactory(true);
+		model.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model.setTargetOutputDataModelId("testXml2");
+		model.setTargetPolicy("NONE");
+
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel();
+		model2.setInputDataModelIdRequirement("testJson");
+		model2.setOutputDataModelIdRequirement("testJson2");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setFromInterfaceTemplate("generic_http");
+		model2.setToInterfaceTemplate("generic_mqtt");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model2.setInputDataModelTranslatorFactory(false);
+		model2.setInputDataModelTranslator("DataModelTranslator");
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model2.setOutputDataModelTranslator("GeneratedDataModelTranslator");
+		model2.setOutputDataModelTranslatorFactory(false);
+		model2.setOutputDataModelTranslatorProperties(Map.of("accessPort", 55555));
+		model2.setTargetOutputDataModelId("testXml2");
+		model2.setTargetPolicy("NONE");
+
+		final TranslationDataModelTranslatorInitializationResponseDTO initTranslatorResponse = new TranslationDataModelTranslatorInitializationResponseDTO(
+				"GeneratedDataModelTranslator",
+				Map.of("accessPort", 55555));
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
+		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
+		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
+		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 44444), "testXml2", "testJson2")).thenReturn(initTranslatorResponse);
+		when(dbService.updateDetailsRecord(details)).thenReturn(false);
+		when(itDriver.initializeBridge(bridgeId, model2, null, null, null, Map.of("a", "b"), null)).thenReturn(Pair.of(Optional.empty(), Optional.of(new ExternalServerError("test"))));
+		doNothing().when(dbService).storeBridgeProblem(bridgeId, "test");
+
+		final ArrowheadException ex = assertThrows(
+				ExternalServerError.class,
+				() -> engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin"));
+
+		assertEquals("test", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
+		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
+		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
+		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 44444), "testXml2", "testJson2");
+		verify(dbService).updateDetailsRecord(details);
+		verify(itDriver).initializeBridge(bridgeId, model2, null, null, null, Map.of("a", "b"), null);
+		verify(dbService).storeBridgeProblem(bridgeId, "test");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationWrongPolicyInInterfaceTranslator() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model.setServiceDefinition("testService");
+		model.setOperation("test-operation");
+		model.setInputDataModelIdRequirement("testJson");
+		model.setOutputDataModelIdRequirement("testJson2");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model.setInputDataModelTranslatorFactory(true);
+		model.setTargetInputDataModelId("testXml");
+		model.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model.setOutputDataModelTranslatorFactory(false);
+		model.setOutputDataModelTranslator("DataModelTranslator");
+		model.setTargetOutputDataModelId("testXml2");
+		model.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel();
+		model2.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model2.setServiceDefinition("testService");
+		model2.setOperation("test-operation");
+		model2.setInputDataModelIdRequirement("testJson");
+		model2.setOutputDataModelIdRequirement("testJson2");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setFromInterfaceTemplate("generic_http");
+		model2.setToInterfaceTemplate("generic_mqtt");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model2.setInputDataModelTranslatorFactory(false);
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslator("GeneratedDataModelTranslator");
+		model2.setInputDataModelTranslatorProperties(Map.of("accessPort", 55555));
+		model2.setOutputDataModelTranslatorFactory(false);
+		model2.setOutputDataModelTranslator("DataModelTranslator");
+		model2.setTargetOutputDataModelId("testXml2");
+		model2.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model2.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final TranslationDataModelTranslatorInitializationResponseDTO initTranslatorResponse = new TranslationDataModelTranslatorInitializationResponseDTO(
+				"GeneratedDataModelTranslator",
+				Map.of("accessPort", 55555));
+
+		final ServiceInstanceInterfaceResponseDTO bridgeResponse = new ServiceInstanceInterfaceResponseDTO("generic_http", "http", "NONE", Map.of("accessPort", 22223));
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
+		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
+		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
+		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation")).thenReturn(new AuthorizationTokenResponseDTO(null, null, "token", null, null, null, null, null, null, null, null, null, null, null, null));
+		when(dbService.updateDetailsRecord(details)).thenReturn(false);
+		when(itDriver.initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"))).thenReturn(Pair.of(Optional.of(bridgeResponse), Optional.empty()));
+		doNothing().when(dbService).storeBridgeProblem(bridgeId, "Interface provider returns with invalid data");
+		doNothing().when(itDriver).abortBridge(bridgeId, Map.of("accessPort", 22222), null);
+
+		final ArrowheadException ex = assertThrows(
+				ExternalServerError.class,
+				() -> engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin"));
+
+		assertEquals("Interface provider returns with invalid data", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
+		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
+		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
+		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation");
+		verify(dbService).updateDetailsRecord(details);
+		verify(itDriver).initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"));
+		verify(dbService).storeBridgeProblem(bridgeId, "Interface provider returns with invalid data");
+		verify(itDriver).abortBridge(bridgeId, Map.of("accessPort", 22222), null);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationIsInEndState2() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model.setServiceDefinition("testService");
+		model.setOperation("test-operation");
+		model.setInputDataModelIdRequirement("testJson");
+		model.setOutputDataModelIdRequirement("testJson2");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model.setInputDataModelTranslatorFactory(true);
+		model.setTargetInputDataModelId("testXml");
+		model.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model.setOutputDataModelTranslatorFactory(false);
+		model.setOutputDataModelTranslator("DataModelTranslator");
+		model.setTargetOutputDataModelId("testXml2");
+		model.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final BridgeHeader header = new BridgeHeader(bridgeId, "TestCreator");
+		header.setId(1L);
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+		details.setHeader(header);
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel();
+		model2.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model2.setServiceDefinition("testService");
+		model2.setOperation("test-operation");
+		model2.setInputDataModelIdRequirement("testJson");
+		model2.setOutputDataModelIdRequirement("testJson2");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setFromInterfaceTemplate("generic_http");
+		model2.setToInterfaceTemplate("generic_mqtt");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model2.setInputDataModelTranslatorFactory(false);
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslator("GeneratedDataModelTranslator");
+		model2.setInputDataModelTranslatorProperties(Map.of("accessPort", 55555));
+		model2.setOutputDataModelTranslatorFactory(false);
+		model2.setOutputDataModelTranslator("DataModelTranslator");
+		model2.setTargetOutputDataModelId("testXml2");
+		model2.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model2.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final TranslationDataModelTranslatorInitializationResponseDTO initTranslatorResponse = new TranslationDataModelTranslatorInitializationResponseDTO(
+				"GeneratedDataModelTranslator",
+				Map.of("accessPort", 55555));
+
+		final ServiceInstanceInterfaceResponseDTO bridgeResponse = new ServiceInstanceInterfaceResponseDTO("generic_http", "http", "TRANSLATION_BRIDGE_TOKEN_AUTH", Map.of("accessPort", 22223));
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
+		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
+		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
+		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation")).thenReturn(new AuthorizationTokenResponseDTO(null, null, "token", null, null, null, null, null, null, null, null, null, null, null, null));
+		when(dbService.updateDetailsRecord(details)).thenReturn(false);
+		when(itDriver.initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"))).thenReturn(Pair.of(Optional.of(bridgeResponse), Optional.empty()));
+		when(dbService.bridgeInitialized(header)).thenReturn(true);
+		doNothing().when(itDriver).abortBridge(bridgeId, Map.of("accessPort", 22222), null);
+		doNothing().when(dbService).storeBridgeProblem(bridgeId, "Bridge is already in an end state");
+
+		final ArrowheadException ex = assertThrows(
+				InvalidParameterException.class,
+				() -> engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin"));
+
+		assertEquals("Bridge is already in an end state", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
+		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
+		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
+		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation");
+		verify(dbService).updateDetailsRecord(details);
+		verify(itDriver).initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"));
+		verify(dbService).bridgeInitialized(header);
+		verify(itDriver).abortBridge(bridgeId, Map.of("accessPort", 22222), null);
+		verify(dbService).storeBridgeProblem(bridgeId, "Bridge is already in an end state");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationOk1() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model.setServiceDefinition("testService");
+		model.setOperation("test-operation");
+		model.setInputDataModelIdRequirement("testJson");
+		model.setOutputDataModelIdRequirement("testJson2");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model.setInputDataModelTranslatorFactory(true);
+		model.setTargetInputDataModelId("testXml");
+		model.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model.setOutputDataModelTranslatorFactory(false);
+		model.setOutputDataModelTranslator("DataModelTranslator");
+		model.setTargetOutputDataModelId("testXml2");
+		model.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final BridgeHeader header = new BridgeHeader(bridgeId, "TestCreator");
+		header.setId(1L);
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+		details.setHeader(header);
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel();
+		model2.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model2.setServiceDefinition("testService");
+		model2.setOperation("test-operation");
+		model2.setInputDataModelIdRequirement("testJson");
+		model2.setOutputDataModelIdRequirement("testJson2");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setFromInterfaceTemplate("generic_http");
+		model2.setToInterfaceTemplate("generic_mqtt");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model2.setInputDataModelTranslatorFactory(false);
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslator("GeneratedDataModelTranslator");
+		model2.setInputDataModelTranslatorProperties(Map.of("accessPort", 55555));
+		model2.setOutputDataModelTranslatorFactory(false);
+		model2.setOutputDataModelTranslator("DataModelTranslator");
+		model2.setTargetOutputDataModelId("testXml2");
+		model2.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model2.setTargetPolicy("USAGE_LIMITED_TOKEN_AUTH");
+
+		final TranslationDataModelTranslatorInitializationResponseDTO initTranslatorResponse = new TranslationDataModelTranslatorInitializationResponseDTO(
+				"GeneratedDataModelTranslator",
+				Map.of("accessPort", 55555));
+
+		final ServiceInstanceInterfaceResponseDTO bridgeResponse = new ServiceInstanceInterfaceResponseDTO("generic_http", "http", "TRANSLATION_BRIDGE_TOKEN_AUTH", Map.of("accessPort", 22223));
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
+		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
+		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
+		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation")).thenReturn(new AuthorizationTokenResponseDTO(null, null, "token", null, null, null, null, null, null, null, null, null, 10, null, "aDate"));
+		when(dbService.updateDetailsRecord(details)).thenReturn(false);
+		when(itDriver.initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"))).thenReturn(Pair.of(Optional.of(bridgeResponse), Optional.empty()));
+		when(dbService.bridgeInitialized(header)).thenReturn(false);
+
+		final TranslationNegotiationResponseDTO result = engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin");
+
+		assertNotNull(result);
+		assertEquals(bridgeId.toString(), result.bridgeId());
+		assertEquals(bridgeResponse, result.bridgeInterface());
+		assertEquals("aDate", result.tokenExpiresAt());
+		assertEquals(10, result.tokenUsageLimit());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
+		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
+		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
+		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
+				"USAGE_LIMITED_TOKEN_AUTH",
+				"InterfaceTranslator",
+				"TestProvider",
+				"testService",
+				"test-operation");
+		verify(dbService).updateDetailsRecord(details);
+		verify(itDriver).initializeBridge(bridgeId, model2, "token", null, null, null, Map.of("a", "b"));
+		verify(dbService).bridgeInitialized(header);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoNegotiationOk2() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel();
+		model.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model.setServiceDefinition("testService");
+		model.setOperation("test-operation");
+		model.setInputDataModelIdRequirement("testJson");
+		model.setOutputDataModelIdRequirement("testJson2");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setFromInterfaceTemplate("generic_http");
+		model.setToInterfaceTemplate("generic_mqtt");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model.setInputDataModelTranslatorFactory(true);
+		model.setTargetInputDataModelId("testXml");
+		model.setInputDataModelTranslatorProperties(Map.of("accessPort", 33333));
+		model.setOutputDataModelTranslatorFactory(false);
+		model.setOutputDataModelTranslator("DataModelTranslator");
+		model.setTargetOutputDataModelId("testXml2");
+		model.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model.setTargetPolicy("NONE");
+
+		final BridgeHeader header = new BridgeHeader(bridgeId, "TestCreator");
+		header.setId(1L);
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+		details.setHeader(header);
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel();
+		model2.setTargetInstanceId("TestProvider|testService|1.0.0");
+		model2.setServiceDefinition("testService");
+		model2.setOperation("test-operation");
+		model2.setInputDataModelIdRequirement("testJson");
+		model2.setOutputDataModelIdRequirement("testJson2");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setFromInterfaceTemplate("generic_http");
+		model2.setToInterfaceTemplate("generic_mqtt");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 22222));
+		model2.setInputDataModelTranslatorFactory(false);
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslator("GeneratedDataModelTranslator");
+		model2.setInputDataModelTranslatorProperties(Map.of("accessPort", 55555));
+		model2.setOutputDataModelTranslatorFactory(false);
+		model2.setOutputDataModelTranslator("DataModelTranslator");
+		model2.setTargetOutputDataModelId("testXml2");
+		model2.setOutputDataModelTranslatorProperties(Map.of("accessPort", 44444));
+		model2.setTargetPolicy("NONE");
+
+		final TranslationDataModelTranslatorInitializationResponseDTO initTranslatorResponse = new TranslationDataModelTranslatorInitializationResponseDTO(
+				"GeneratedDataModelTranslator",
+				Map.of("accessPort", 55555));
+
+		final ServiceInstanceInterfaceResponseDTO bridgeResponse = new ServiceInstanceInterfaceResponseDTO("generic_http", "http", "TRANSLATION_BRIDGE_TOKEN_AUTH", Map.of("accessPort", 22223));
+
+		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
+		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
+		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
+		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
+		when(dbService.updateDetailsRecord(details)).thenReturn(false);
+		when(itDriver.initializeBridge(bridgeId, model2, null, null, null, null, Map.of("a", "b"))).thenReturn(Pair.of(Optional.of(bridgeResponse), Optional.empty()));
+		when(dbService.bridgeInitialized(header)).thenReturn(false);
+
+		final TranslationNegotiationResponseDTO result = engine.doNegotiation(bridgeId, "TestProvider|testService|1.0.0", "origin");
+
+		assertNotNull(result);
+		assertEquals(bridgeId.toString(), result.bridgeId());
+		assertEquals(bridgeResponse, result.bridgeInterface());
+		assertNull(result.tokenExpiresAt());
+		assertNull(result.tokenUsageLimit());
+
+		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
+		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
+		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
+		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
+		verify(dbService).updateDetailsRecord(details);
+		verify(itDriver).initializeBridge(bridgeId, model2, null, null, null, null, Map.of("a", "b"));
+		verify(dbService).bridgeInitialized(header);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortBridgeIdsListNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> engine.doAbort(null, null, null));
+
+		assertEquals("bridge identifier list is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortBridgeIdsListEmpty() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> engine.doAbort(List.of(), null, null));
+
+		assertEquals("bridge identifier list is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortBridgeIdsListContainsNull() {
+		final List<UUID> list = new ArrayList<>(1);
+		list.add(null);
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> engine.doAbort(list, null, null));
+
+		assertEquals("bridge identifier list contains null element", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortOriginNull() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> engine.doAbort(List.of(bridgeId), null, null));
+
+		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortOriginEmpty() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> engine.doAbort(List.of(bridgeId), null, ""));
+
+		assertEquals("origin is empty", ex.getMessage());
 	}
 }
