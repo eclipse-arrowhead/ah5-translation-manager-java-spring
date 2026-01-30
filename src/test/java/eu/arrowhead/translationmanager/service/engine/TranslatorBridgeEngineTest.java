@@ -17,10 +17,12 @@
 package eu.arrowhead.translationmanager.service.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -46,6 +48,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.util.Pair;
 
+import eu.arrowhead.common.Utilities;
 import eu.arrowhead.common.exception.ArrowheadException;
 import eu.arrowhead.common.exception.AuthException;
 import eu.arrowhead.common.exception.DataNotFoundException;
@@ -64,11 +67,13 @@ import eu.arrowhead.dto.TranslationBridgeCandidateDTO;
 import eu.arrowhead.dto.TranslationDataModelTranslatorInitializationResponseDTO;
 import eu.arrowhead.dto.TranslationDiscoveryResponseDTO;
 import eu.arrowhead.dto.TranslationNegotiationResponseDTO;
+import eu.arrowhead.dto.enums.TranslationBridgeStatus;
 import eu.arrowhead.dto.enums.TranslationDiscoveryFlag;
 import eu.arrowhead.translationmanager.TranslationManagerSystemInfo;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeDetails;
 import eu.arrowhead.translationmanager.jpa.entity.BridgeHeader;
 import eu.arrowhead.translationmanager.jpa.service.BridgeDbService;
+import eu.arrowhead.translationmanager.jpa.service.BridgeDbService.AbortResult;
 import eu.arrowhead.translationmanager.service.dto.DTOConverter;
 import eu.arrowhead.translationmanager.service.dto.NormalizedServiceInstanceDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationDiscoveryRequestDTO;
@@ -2529,5 +2534,139 @@ public class TranslatorBridgeEngineTest {
 				() -> engine.doAbort(List.of(bridgeId), null, ""));
 
 		assertEquals("origin is empty", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortForbiddenException() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenThrow(new ForbiddenException("test"));
+
+		final ArrowheadException ex = assertThrows(
+				ForbiddenException.class,
+				() -> engine.doAbort(List.of(bridgeId), "ANobody", "origin"));
+
+		assertEquals("test", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortInternalServerError() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenThrow(new InternalServerError("test"));
+
+		final ArrowheadException ex = assertThrows(
+				InternalServerError.class,
+				() -> engine.doAbort(List.of(bridgeId), "ANobody", "origin"));
+
+		assertEquals("test", ex.getMessage());
+		assertEquals("origin", ex.getOrigin());
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testDoAbortNonActiveBridge() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final AbortResult abortResult = new AbortResult(true, TranslationBridgeStatus.NEW, null);
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenReturn(abortResult);
+
+		final Map<String, Boolean> result = engine.doAbort(List.of(bridgeId), "ANobody", "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertTrue(result.get(bridgeId.toString()));
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+		verify(itDriver, never()).abortBridge(eq(bridgeId), anyMap(), anyString());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoAbortActiveBridge() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+		details.setInterfaceTranslatorData(Utilities.toJson(Map.of(
+				"fromInterfaceTemplate", "generic_http",
+				"toInterfaceTemplate", "generic_mqtt",
+				"token", "itToken",
+				"interfaceProperties", Map.of("accessPort", 12345))));
+
+		final AbortResult abortResult = new AbortResult(true, TranslationBridgeStatus.INITIALIZED, details);
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenReturn(abortResult);
+		doNothing().when(itDriver).abortBridge(bridgeId, Map.of("accessPort", 12345), "itToken");
+
+		final Map<String, Boolean> result = engine.doAbort(List.of(bridgeId), "ANobody", "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertTrue(result.get(bridgeId.toString()));
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+		verify(itDriver).abortBridge(bridgeId, Map.of("accessPort", 12345), "itToken");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoAbortBridgeUnknown() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final AbortResult abortResult = new AbortResult(false, null, null);
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenReturn(abortResult);
+
+		final Map<String, Boolean> result = engine.doAbort(List.of(bridgeId), "ANobody", "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertFalse(result.get(bridgeId.toString()));
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoAbortBridgeInEndState() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final AbortResult abortResult = new AbortResult(false, TranslationBridgeStatus.CLOSED, null);
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenReturn(abortResult);
+
+		final Map<String, Boolean> result = engine.doAbort(List.of(bridgeId), "ANobody", "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertTrue(result.get(bridgeId.toString()));
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoAbortBridgeNotAborted() {
+		final UUID bridgeId = UUID.fromString("3b40df99-1468-4d84-bd8e-bfe6d895ebbe");
+		final AbortResult abortResult = new AbortResult(false, TranslationBridgeStatus.USED, null);
+
+		when(dbService.abortBridge(bridgeId, "ANobody")).thenReturn(abortResult);
+
+		final Map<String, Boolean> result = engine.doAbort(List.of(bridgeId), "ANobody", "origin");
+
+		assertNotNull(result);
+		assertEquals(1, result.size());
+		assertFalse(result.get(bridgeId.toString()));
+
+		verify(dbService).abortBridge(bridgeId, "ANobody");
 	}
 }
