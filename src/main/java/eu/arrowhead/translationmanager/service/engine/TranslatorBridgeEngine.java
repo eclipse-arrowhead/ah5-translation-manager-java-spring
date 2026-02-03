@@ -17,6 +17,7 @@
 package eu.arrowhead.translationmanager.service.engine;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -875,7 +876,27 @@ public class TranslatorBridgeEngine {
 	private ServiceInstanceResponseDTO selectDataModelTranslatorFactoryIfPossible(final String from, final String to) {
 		logger.debug("selectDataModelTranslatorFactoryIfPossible started...");
 
-		// TODO: implement data model translator factories-related business logic here
+		final List<ServiceInstanceResponseDTO> dmtfCandidates = csDriver.collectDataModelTranslatorFactoryCandidates();
+		if (Utilities.isEmpty(dmtfCandidates)) {
+			// no available factories
+
+			return null;
+		}
+
+		// shuffle to give every factory instance an "equal" chance
+		Collections.shuffle(dmtfCandidates);
+
+		for (final ServiceInstanceResponseDTO factory : dmtfCandidates) {
+			final boolean supported = dmfDriver.isFactorySupportsTranslation(
+					factory.provider().name(),
+					factory.interfaces().get(0).properties(),
+					from,
+					to);
+
+			if (supported) {
+				return factory;
+			}
+		}
 
 		return null;
 	}

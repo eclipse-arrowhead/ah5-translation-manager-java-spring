@@ -295,6 +295,21 @@ public class CoreSystemsDriver {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	public List<ServiceInstanceResponseDTO> collectDataModelTranslatorFactoryCandidates() {
+		logger.debug("collectDataModelTranslatorFactoryCandidates started...");
+
+		final ServiceInstanceLookupRequestDTO payload = calculateDataModelTranslatorFactoryLookupPayload();
+		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
+				Constants.SERVICE_DEF_SERVICE_DISCOVERY,
+				Constants.SERVICE_OP_LOOKUP,
+				Constants.SYS_NAME_SERVICE_REGISTRY,
+				ServiceInstanceListResponseDTO.class,
+				payload);
+
+		return response.entries();
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	public Map<String, Object> getConfigurationForSystem(final String systemName) {
 		logger.debug("getConfigurationForSystem started...");
 		Assert.isTrue(!Utilities.isEmpty(systemName), "system name is missing");
@@ -464,5 +479,27 @@ public class CoreSystemsDriver {
 		});
 
 		return new ArrayList<>(resultSet);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private ServiceInstanceLookupRequestDTO calculateDataModelTranslatorFactoryLookupPayload() {
+		logger.debug("calculateDataModelTranslatorFactoryLookupPayload started...");
+
+		final String templateName = sysInfo.isSslEnabled() ? Constants.GENERIC_HTTPS_INTERFACE_TEMPLATE_NAME : Constants.GENERIC_HTTP_INTERFACE_TEMPLATE_NAME;
+		final List<String> policies = AuthenticationPolicy.CERTIFICATE == sysInfo.getAuthenticationPolicy()
+				? List.of(ServiceInterfacePolicy.CERT_AUTH.name(), ServiceInterfacePolicy.NONE.name())
+				: List.of(ServiceInterfacePolicy.NONE.name());
+
+		ServiceInstanceLookupRequestDTO.Builder builder = new ServiceInstanceLookupRequestDTO.Builder()
+				.serviceDefinitionName(Constants.SERVICE_DEF_DATA_MODEL_TRANSLATOR_FACTORY_CONTROL)
+				.interfaceTemplateName(templateName)
+				.policies(policies);
+
+		if (translatorServiceMinAvailability > 0) {
+			final ZonedDateTime alivesAt = Utilities.utcNow().plusMinutes(translatorServiceMinAvailability);
+			builder = builder.alivesAt(Utilities.convertZonedDateTimeToUTCString(alivesAt));
+		}
+
+		return builder.build();
 	}
 }
