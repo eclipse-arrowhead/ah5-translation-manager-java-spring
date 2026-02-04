@@ -917,6 +917,7 @@ public class TranslatorBridgeEngine {
 		Map<String, Object> inputDataModelTranslatorSettings = null;
 		if (model.isInputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
+					model.getInputDataModelTranslator(),
 					model.getInputDataModelTranslatorProperties(),
 					model.getInputDataModelIdRequirement(),
 					model.getTargetInputDataModelId());
@@ -950,6 +951,7 @@ public class TranslatorBridgeEngine {
 		Map<String, Object> outputDataModelTranslatorSettings = null;
 		if (model.isOutputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
+					model.getOutputDataModelTranslator(),
 					model.getOutputDataModelTranslatorProperties(),
 					model.getTargetOutputDataModelId(),
 					model.getOutputDataModelIdRequirement());

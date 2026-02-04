@@ -2088,7 +2088,7 @@ public class TranslatorBridgeEngineTest {
 		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
 		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
 		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
-		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 44444), "testXml2", "testJson2")).thenReturn(initTranslatorResponse);
+		when(dmfDriver.initializeDataModelTranslator(null, Map.of("accessPort", 44444), "testXml2", "testJson2")).thenReturn(initTranslatorResponse);
 		when(dbService.updateDetailsRecord(details)).thenReturn(false);
 		when(itDriver.initializeBridge(bridgeId, model2, null, null, null, Map.of("a", "b"), null)).thenReturn(Pair.of(Optional.empty(), Optional.of(new ExternalServerError("test"))));
 		doNothing().when(dbService).storeBridgeProblem(bridgeId, "test");
@@ -2104,7 +2104,7 @@ public class TranslatorBridgeEngineTest {
 		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
 		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
-		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 44444), "testXml2", "testJson2");
+		verify(dmfDriver).initializeDataModelTranslator(null, Map.of("accessPort", 44444), "testXml2", "testJson2");
 		verify(dbService).updateDetailsRecord(details);
 		verify(itDriver).initializeBridge(bridgeId, model2, null, null, null, Map.of("a", "b"), null);
 		verify(dbService).storeBridgeProblem(bridgeId, "test");
@@ -2166,7 +2166,7 @@ public class TranslatorBridgeEngineTest {
 		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
 		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
 		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
-		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(dmfDriver.initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
 		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
 		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2189,7 +2189,7 @@ public class TranslatorBridgeEngineTest {
 		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
 		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
-		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(dmfDriver).initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml");
 		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
 		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2262,7 +2262,7 @@ public class TranslatorBridgeEngineTest {
 		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
 		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
 		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
-		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(dmfDriver.initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
 		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
 		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2286,7 +2286,7 @@ public class TranslatorBridgeEngineTest {
 		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
 		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
-		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(dmfDriver).initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml");
 		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
 		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2360,7 +2360,7 @@ public class TranslatorBridgeEngineTest {
 		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
 		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
 		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
-		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(dmfDriver.initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
 		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
 		when(csDriver.generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2383,7 +2383,7 @@ public class TranslatorBridgeEngineTest {
 		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
 		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
-		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(dmfDriver).initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml");
 		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
 		verify(csDriver).generateTokenForInterfaceTranslatorToTargetOperation(
 				"USAGE_LIMITED_TOKEN_AUTH",
@@ -2455,7 +2455,7 @@ public class TranslatorBridgeEngineTest {
 		when(dbService.selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0")).thenReturn(Pair.of(model, details));
 		when(sysInfo.isCustomConfigurationEnabled()).thenReturn(true);
 		when(csDriver.getConfigurationForSystem("InterfaceTranslator")).thenReturn(null);
-		when(dmfDriver.initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
+		when(dmfDriver.initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml")).thenReturn(initTranslatorResponse);
 		when(csDriver.getConfigurationForSystem("DataModelTranslator")).thenReturn(Map.of("a", "b"));
 		when(dbService.updateDetailsRecord(details)).thenReturn(false);
 		when(itDriver.initializeBridge(bridgeId, model2, null, null, null, null, Map.of("a", "b"))).thenReturn(Pair.of(Optional.of(bridgeResponse), Optional.empty()));
@@ -2472,7 +2472,7 @@ public class TranslatorBridgeEngineTest {
 		verify(dbService).selectBridgeFromDiscoveries(bridgeId, "TestProvider|testService|1.0.0");
 		verify(sysInfo, times(2)).isCustomConfigurationEnabled();
 		verify(csDriver).getConfigurationForSystem("InterfaceTranslator");
-		verify(dmfDriver).initializeDataModelTranslator(Map.of("accessPort", 33333), "testJson", "testXml");
+		verify(dmfDriver).initializeDataModelTranslator(null, Map.of("accessPort", 33333), "testJson", "testXml");
 		verify(csDriver).getConfigurationForSystem("DataModelTranslator");
 		verify(dbService).updateDetailsRecord(details);
 		verify(itDriver).initializeBridge(bridgeId, model2, null, null, null, null, Map.of("a", "b"));

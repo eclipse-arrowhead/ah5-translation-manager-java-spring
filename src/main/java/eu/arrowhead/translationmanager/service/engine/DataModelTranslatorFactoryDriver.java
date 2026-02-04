@@ -16,6 +16,7 @@
  *******************************************************************************/
 package eu.arrowhead.translationmanager.service.engine;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,11 +33,15 @@ import eu.arrowhead.common.SystemInfo;
 import eu.arrowhead.common.Utilities;
 import eu.arrowhead.common.exception.ArrowheadException;
 import eu.arrowhead.common.exception.ExternalServerError;
-import eu.arrowhead.common.exception.InternalServerError;
+import eu.arrowhead.common.exception.InvalidParameterException;
 import eu.arrowhead.common.http.HttpService;
 import eu.arrowhead.common.http.HttpUtilities;
 import eu.arrowhead.common.http.model.HttpInterfaceModel;
 import eu.arrowhead.common.http.model.HttpOperationModel;
+import eu.arrowhead.common.intf.properties.IPropertyValidator;
+import eu.arrowhead.common.intf.properties.PropertyValidatorType;
+import eu.arrowhead.common.intf.properties.PropertyValidators;
+import eu.arrowhead.dto.DataModelFactoryTranslatorInitiaizationResponseDTO;
 import eu.arrowhead.dto.DataModelTranslatorFactoryRequestDTO;
 import eu.arrowhead.dto.TranslationDataModelTranslatorInitializationResponseDTO;
 
@@ -54,6 +59,9 @@ public class DataModelTranslatorFactoryDriver {
 	@Autowired
 	private HttpService httpService;
 
+	@Autowired
+	private PropertyValidators validators;
+
 	//=================================================================================================
 	// methods
 
@@ -65,6 +73,7 @@ public class DataModelTranslatorFactoryDriver {
 			final String fromDataModelId,
 			final String toDataModelId) {
 		logger.debug("isFactorySupportsTranslation started...");
+		Assert.isTrue(!Utilities.isEmpty(factoryName), "Factory name is missing");
 		Assert.isTrue(!Utilities.isEmpty(factoryInterfaceProperties), "Factory interface properties is missing");
 		Assert.isTrue(!Utilities.isEmpty(fromDataModelId), "From data model identifier is missing");
 		Assert.isTrue(!Utilities.isEmpty(toDataModelId), "To data model identifier is missing");
@@ -77,8 +86,8 @@ public class DataModelTranslatorFactoryDriver {
 		final String basePath = factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_BASE_PATH).toString();
 		if (factoryInterfaceProperties.containsKey(HttpInterfaceModel.PROP_NAME_OPERATIONS)
 				&& (factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_OPERATIONS) instanceof final Map operationsMap)
-				&& operationsMap.containsKey(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_INIT_BRIDGE)) {
-			final Object value = operationsMap.get(Constants.SERVICE_OP_INTERFACE_TRANSLATOR_INIT_BRIDGE);
+				&& operationsMap.containsKey(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_FACTORY_CHECK)) {
+			final Object value = operationsMap.get(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_FACTORY_CHECK);
 			try {
 				final HttpOperationModel operationModel = Utilities.fromJson(Utilities.toJson(value), HttpOperationModel.class);
 				method = HttpMethod.valueOf(operationModel.method());
@@ -89,7 +98,7 @@ public class DataModelTranslatorFactoryDriver {
 		}
 
 		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath);
-		final DataModelTranslatorFactoryRequestDTO payload = calculateCheckPayload(fromDataModelId, toDataModelId);
+		final DataModelTranslatorFactoryRequestDTO payload = calculatePayload(fromDataModelId, toDataModelId);
 
 		try {
 			final Boolean response = httpService.sendRequest(
@@ -98,7 +107,7 @@ public class DataModelTranslatorFactoryDriver {
 					Boolean.class,
 					payload);
 
-			return response == null ? false : response;
+			return response == null ? false : response.booleanValue();
 		} catch (final ArrowheadException ex) {
 			logger.error(ex.getMessage());
 			logger.debug(ex);
@@ -108,27 +117,138 @@ public class DataModelTranslatorFactoryDriver {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("unchecked")
 	public TranslationDataModelTranslatorInitializationResponseDTO initializeDataModelTranslator(
+			final String factoryName,
 			final Map<String, Object> factoryInterfaceProperties,
 			final String fromDataModelId,
 			final String toDataModelId) throws ExternalServerError {
 		logger.debug("initializeDataModelTranslator started...");
+		Assert.isTrue(!Utilities.isEmpty(factoryName), "Factory name is missing");
 		Assert.isTrue(!Utilities.isEmpty(factoryInterfaceProperties), "Factory interface properties is missing");
 		Assert.isTrue(!Utilities.isEmpty(fromDataModelId), "From data model identifier is missing");
 		Assert.isTrue(!Utilities.isEmpty(toDataModelId), "To data model identifier is missing");
 
-		// TODO: implement to support data model translator factories
+		HttpMethod method = HttpMethod.POST; // default method
+		String operationPath = "/initialize-translator"; // default path
+		final String scheme = sysInfo.isSslEnabled() ? Constants.HTTPS : Constants.HTTP;
+		final String host = ((List<String>) factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_ACCESS_ADDRESSES)).get(0);
+		final int port = (int) factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_ACCESS_PORT);
+		final String basePath = factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_BASE_PATH).toString();
+		if (factoryInterfaceProperties.containsKey(HttpInterfaceModel.PROP_NAME_OPERATIONS)
+				&& (factoryInterfaceProperties.get(HttpInterfaceModel.PROP_NAME_OPERATIONS) instanceof final Map operationsMap)
+				&& operationsMap.containsKey(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_FACTORY_INITIALIZE)) {
+			final Object value = operationsMap.get(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_FACTORY_INITIALIZE);
+			try {
+				final HttpOperationModel operationModel = Utilities.fromJson(Utilities.toJson(value), HttpOperationModel.class);
+				method = HttpMethod.valueOf(operationModel.method());
+				operationPath = operationModel.path();
+			} catch (final ArrowheadException ex) {
+				logger.warn("Invalid operations property for data model translator factory {}", factoryName);
+			}
+		}
 
-		throw new InternalServerError("Data model translator factories are currently not supported");
+		final UriComponents uri = HttpUtilities.createURI(scheme, host, port, basePath + operationPath);
+		final DataModelTranslatorFactoryRequestDTO payload = calculatePayload(fromDataModelId, toDataModelId);
+
+		final DataModelFactoryTranslatorInitiaizationResponseDTO response = httpService.sendRequest(
+				uri,
+				method,
+				DataModelFactoryTranslatorInitiaizationResponseDTO.class,
+				payload);
+
+		return validateAndNormalizeResponse(response);
 	}
 
 	//=================================================================================================
 	// assistant methods
 
 	//-------------------------------------------------------------------------------------------------
-	private DataModelTranslatorFactoryRequestDTO calculateCheckPayload(final String fromDataModelId, final String toDataModelId) {
+	private DataModelTranslatorFactoryRequestDTO calculatePayload(final String fromDataModelId, final String toDataModelId) {
 		logger.debug("calculateCheckPayload started...");
 
 		return new DataModelTranslatorFactoryRequestDTO(fromDataModelId, toDataModelId);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private TranslationDataModelTranslatorInitializationResponseDTO validateAndNormalizeResponse(final DataModelFactoryTranslatorInitiaizationResponseDTO response) {
+		logger.debug("validateResponse started...");
+
+		if (response == null) {
+			throw new ExternalServerError("missing response");
+		}
+
+		if (Utilities.isEmpty(response.dataModelTranslatorName())) {
+			throw new ExternalServerError("data model translator name is missing");
+		}
+
+		if (Utilities.isEmpty(response.interfaceProperties())) {
+			throw new ExternalServerError("data model translator interface properties is missing");
+		}
+
+		final Map<String, Object> normalizedProperties = new HashMap<>(response.interfaceProperties().size());
+
+		try {
+			// access addresses
+			if (!response.interfaceProperties().containsKey(HttpInterfaceModel.PROP_NAME_ACCESS_ADDRESSES)) {
+				throw new ExternalServerError("Missing property: " + HttpInterfaceModel.PROP_NAME_ACCESS_ADDRESSES);
+			}
+
+			final IPropertyValidator addressesValidator = validators.getValidator(PropertyValidatorType.NOT_EMPTY_ADDRESS_LIST);
+			normalizedProperties.put(
+					HttpInterfaceModel.PROP_NAME_ACCESS_ADDRESSES,
+					addressesValidator.validateAndNormalize(response.interfaceProperties().get(HttpInterfaceModel.PROP_NAME_ACCESS_ADDRESSES)));
+
+			// access port
+			if (!response.interfaceProperties().containsKey(HttpInterfaceModel.PROP_NAME_ACCESS_PORT)) {
+				throw new ExternalServerError("Missing property: " + HttpInterfaceModel.PROP_NAME_ACCESS_PORT);
+			}
+
+			final IPropertyValidator portValidator = validators.getValidator(PropertyValidatorType.PORT);
+			normalizedProperties.put(
+					HttpInterfaceModel.PROP_NAME_ACCESS_PORT,
+					portValidator.validateAndNormalize(response.interfaceProperties().get(HttpInterfaceModel.PROP_NAME_ACCESS_PORT)));
+
+			// base path
+			if (!response.interfaceProperties().containsKey(HttpInterfaceModel.PROP_NAME_BASE_PATH)) {
+				throw new ExternalServerError("Missing property: " + HttpInterfaceModel.PROP_NAME_BASE_PATH);
+			}
+
+			if (response.interfaceProperties().get(HttpInterfaceModel.PROP_NAME_BASE_PATH) instanceof final String basePath) {
+				normalizedProperties.put(
+						HttpInterfaceModel.PROP_NAME_BASE_PATH,
+						basePath.trim());
+			} else {
+				throw new ExternalServerError("Invalid property: " + HttpInterfaceModel.PROP_NAME_BASE_PATH);
+			}
+
+			// operations
+			if (!response.interfaceProperties().containsKey(HttpInterfaceModel.PROP_NAME_OPERATIONS)) {
+				throw new ExternalServerError("Missing property: " + HttpInterfaceModel.PROP_NAME_OPERATIONS);
+			}
+
+			final IPropertyValidator operationsValidator = validators.getValidator(PropertyValidatorType.HTTP_OPERATIONS);
+			@SuppressWarnings("unchecked")
+			final Map<String, HttpOperationModel> normalizedOperations = (Map<String, HttpOperationModel>) operationsValidator
+					.validateAndNormalize(response.interfaceProperties().get(HttpInterfaceModel.PROP_NAME_OPERATIONS));
+
+			if (!normalizedOperations.containsKey(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_INIT_TRANSLATION)) {
+				throw new ExternalServerError("Missing operation: " + Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_INIT_TRANSLATION);
+			}
+
+			if (!normalizedOperations.containsKey(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_GET_TRANSLATION_RESULT)) {
+				throw new ExternalServerError("Missing operation: " + Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_GET_TRANSLATION_RESULT);
+			}
+
+			if (!normalizedOperations.containsKey(Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_ABORT_TRANSLATION)) {
+				throw new ExternalServerError("Missing operation: " + Constants.SERVICE_OP_DATA_MODEL_TRANSLATOR_ABORT_TRANSLATION);
+			}
+
+			normalizedProperties.put(HttpInterfaceModel.PROP_NAME_OPERATIONS, normalizedOperations);
+		} catch (final InvalidParameterException ex) {
+			throw new ExternalServerError(ex.getMessage());
+		}
+
+		return new TranslationDataModelTranslatorInitializationResponseDTO(response.dataModelTranslatorName(), normalizedProperties);
 	}
 }

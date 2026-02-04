@@ -43,7 +43,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorPropertiesNull() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(null, null, null));
+				() -> driver.initializeDataModelTranslator(null, null, null, null));
 
 		assertEquals("Factory interface properties is missing", ex.getMessage());
 	}
@@ -53,7 +53,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorPropertiesEmpty() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(Map.of(), null, null));
+				() -> driver.initializeDataModelTranslator(null, Map.of(), null, null));
 
 		assertEquals("Factory interface properties is missing", ex.getMessage());
 	}
@@ -63,7 +63,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorFromNull() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(Map.of("a", "b"), null, null));
+				() -> driver.initializeDataModelTranslator(null, Map.of("a", "b"), null, null));
 
 		assertEquals("From data model identifier is missing", ex.getMessage());
 	}
@@ -73,7 +73,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorFromEmpty() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(Map.of("a", "b"), "", null));
+				() -> driver.initializeDataModelTranslator(null, Map.of("a", "b"), "", null));
 
 		assertEquals("From data model identifier is missing", ex.getMessage());
 	}
@@ -83,7 +83,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorToNull() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(Map.of("a", "b"), "testXml", null));
+				() -> driver.initializeDataModelTranslator(null, Map.of("a", "b"), "testXml", null));
 
 		assertEquals("To data model identifier is missing", ex.getMessage());
 	}
@@ -93,7 +93,7 @@ public class DataModelTranslatorFactoryDriverTest {
 	public void testInitializeDataModelTranslatorToEmpty() {
 		final Throwable ex = assertThrows(
 				IllegalArgumentException.class,
-				() -> driver.initializeDataModelTranslator(Map.of("a", "b"), "testXml", ""));
+				() -> driver.initializeDataModelTranslator(null, Map.of("a", "b"), "testXml", ""));
 
 		assertEquals("To data model identifier is missing", ex.getMessage());
 	}
