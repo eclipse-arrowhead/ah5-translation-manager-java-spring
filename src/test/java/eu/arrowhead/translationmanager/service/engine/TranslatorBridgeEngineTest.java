@@ -1535,6 +1535,117 @@ public class TranslatorBridgeEngineTest {
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testDoDiscoveryTranslationNotSupportedByFactory() {
+		final Map<String, String> opMap = new HashMap<>(1);
+		opMap.put("input", null);
+		opMap.put("output", "testXml");
+		final ServiceInstanceInterfaceResponseDTO targetIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("dataModels", Map.of("test-operation", opMap)));
+
+		final List<NormalizedServiceInstanceDTO> candidates = List.of(new NormalizedServiceInstanceDTO("TestProvider|testService|1.0.0", "TestProvider", "testService", List.of(targetIntf)));
+		final NormalizedTranslationDiscoveryRequestDTO dto = new NormalizedTranslationDiscoveryRequestDTO(
+				"TestCreator",
+				candidates,
+				"TestConsumer",
+				"test-operation",
+				List.of("generic_mqtt"),
+				null,
+				"testJson");
+
+		final Map<TranslationDiscoveryFlag, Boolean> flags = Map.of(
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false);
+
+		final ServiceInstanceInterfaceResponseDTO iTranslatorIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final ServiceInstanceResponseDTO interfaceTranslator = new ServiceInstanceResponseDTO(
+				"InterfaceTranslator|interfaceBridgeManagement|1.0.0",
+				new SystemResponseDTO("InterfaceTranslator", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("interfaceBridgeManagement", null, null),
+				"1.0.0",
+				null,
+				Map.of("interfaceBridge", Map.of("to", "generic_http", "from", List.of("generic_mqtt"))),
+				List.of(iTranslatorIntf),
+				null,
+				null);
+
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				"TestConsumer",
+				null,
+				"testJson");
+		model.setFromInterfaceTemplate("generic_mqtt");
+		model.setToInterfaceTemplate("generic_http");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setInterfaceTranslatorPolicy("NONE");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 12345));
+		model.setTargetPolicy("NONE");
+		model.setTargetProperties(Map.of("dataModels", Map.of("test-operation", opMap)));
+		model.setTargetOutputDataModelId("testXml");
+
+		final ServiceInstanceInterfaceResponseDTO dmTranslatorFactoryIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12347));
+
+		final ServiceInstanceResponseDTO dataModelTranslatorFactory = new ServiceInstanceResponseDTO(
+				"DataModelTranslatorFactory|dataModelTranslatorFactoryControl|1.0.0",
+				new SystemResponseDTO("DataModelTranslatorFactory", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("dataModelTranslatorFactoryControl", null, null),
+				"1.0.0",
+				null,
+				Map.of(),
+				List.of(dmTranslatorFactoryIntf),
+				null,
+				null);
+
+		when(dataModelIdentifierNormalizer.normalize("testXml")).thenReturn("testXml");
+		doNothing().when(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+		when(csDriver.collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates)).thenReturn(List.of(interfaceTranslator));
+		when(csDriver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator))).thenReturn(Map.of());
+		when(itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates)).thenReturn(candidates);
+		when(interfaceTranslatorMatchmaker.doMatchmaking(List.of(interfaceTranslator), Map.of())).thenReturn(interfaceTranslator);
+		when(csDriver.collectDataModelTranslatorCandidates(List.of(model))).thenReturn(List.of());
+		when(csDriver.collectDataModelTranslatorFactoryCandidates()).thenReturn(List.of(dataModelTranslatorFactory));
+		when(dmfDriver.isFactorySupportsTranslation("DataModelTranslatorFactory", dmTranslatorFactoryIntf.properties(), "testXml", "testJson")).thenReturn(false);
+
+		final TranslationDiscoveryResponseDTO result = engine.doDiscovery(dto, flags, "origin");
+
+		assertNotNull(result);
+		assertNull(result.bridgeId());
+		assertTrue(result.candidates().isEmpty());
+
+		verify(csDriver, never()).isBlacklisted("TestConsumer");
+		verify(csDriver, never()).filterOutBlacklistedSystems(List.of("TestProvider"));
+		verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("TestProvider"), "TestConsumer", "testService", "test-operation");
+		verify(dataModelIdentifierNormalizer).normalize("testXml");
+		verify(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+		verify(csDriver).collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates);
+		verify(csDriver).generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator));
+		verify(itDriver).filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates);
+		verify(interfaceTranslatorMatchmaker).doMatchmaking(List.of(interfaceTranslator), Map.of());
+		verify(csDriver).collectDataModelTranslatorCandidates(List.of(model));
+		verify(csDriver).collectDataModelTranslatorFactoryCandidates();
+		verify(dmfDriver).isFactorySupportsTranslation("DataModelTranslatorFactory", dmTranslatorFactoryIntf.properties(), "testXml", "testJson");
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	@SuppressWarnings({ "checkstyle:MagicNumber", "checkstyle:MethodLength" })
 	@Test
 	public void testDoDiscoveryOk1() {
@@ -1829,6 +1940,152 @@ public class TranslatorBridgeEngineTest {
 			verify(csDriver, never()).filterOutBlacklistedSystems(List.of("DataModelTranslator"));
 			verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("DataModelTranslator"), "InterfaceTranslator", "dataModelTranslation", null);
 			verify(dataModelTranslatorMatchmaker).doMatchmaking(List.of(dataModelTranslator), Map.of());
+			mockedUUID.verify(() -> UUID.randomUUID());
+			verify(dbService).storeBridgeDiscoveries(bridgeId, "TestCreator", List.of(model2));
+			verify(converter).convertDiscoveryModels(bridgeId, List.of(model2));
+		}
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings({ "checkstyle:MagicNumber", "checkstyle:MethodLength" })
+	@Test
+	public void testDoDiscoveryOk3() {
+		final Map<String, String> opMap = new HashMap<>(1);
+		opMap.put("input", "testXml");
+		opMap.put("output", null);
+		final ServiceInstanceInterfaceResponseDTO targetIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("dataModels", Map.of("test-operation", opMap)));
+
+		final List<NormalizedServiceInstanceDTO> candidates = List.of(new NormalizedServiceInstanceDTO("TestProvider|testService|1.0.0", "TestProvider", "testService", List.of(targetIntf)));
+		final NormalizedTranslationDiscoveryRequestDTO dto = new NormalizedTranslationDiscoveryRequestDTO(
+				"TestCreator",
+				candidates,
+				"TestConsumer",
+				"test-operation",
+				List.of("generic_mqtt"),
+				"testJson",
+				null);
+
+		final Map<TranslationDiscoveryFlag, Boolean> flags = Map.of(
+				TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.CANDIDATES_AUTH_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_BLACKLIST_CHECK, false,
+				TranslationDiscoveryFlag.TRANSLATORS_AUTH_CHECK, false);
+
+		final ServiceInstanceInterfaceResponseDTO iTranslatorIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12345));
+
+		final ServiceInstanceResponseDTO interfaceTranslator = new ServiceInstanceResponseDTO(
+				"InterfaceTranslator|interfaceBridgeManagement|1.0.0",
+				new SystemResponseDTO("InterfaceTranslator", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("interfaceBridgeManagement", null, null),
+				"1.0.0",
+				null,
+				Map.of("interfaceBridge", Map.of("to", "generic_http", "from", List.of("generic_mqtt"))),
+				List.of(iTranslatorIntf),
+				null,
+				null);
+
+		final ServiceInstanceInterfaceResponseDTO dmTranslatorFactoryIntf = new ServiceInstanceInterfaceResponseDTO(
+				"generic_http",
+				"http",
+				"NONE",
+				Map.of("accessPort", 12347));
+
+		final ServiceInstanceResponseDTO dataModelTranslatorFactory = new ServiceInstanceResponseDTO(
+				"DataModelTranslatorFactory|dataModelTranslatorFactoryControl|1.0.0",
+				new SystemResponseDTO("DataModelTranslatorFactory", null, null, null, null, null, null),
+				new ServiceDefinitionResponseDTO("dataModelTranslatorFactoryControl", null, null),
+				"1.0.0",
+				null,
+				Map.of(),
+				List.of(dmTranslatorFactoryIntf),
+				null,
+				null);
+
+		final TranslationDiscoveryModel model = new TranslationDiscoveryModel(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				"TestConsumer",
+				"testJson",
+				null);
+		model.setFromInterfaceTemplate("generic_mqtt");
+		model.setToInterfaceTemplate("generic_http");
+		model.setInterfaceTranslator("InterfaceTranslator");
+		model.setInterfaceTranslatorPolicy("NONE");
+		model.setInterfaceTranslatorProperties(Map.of("accessPort", 12345));
+		model.setTargetPolicy("NONE");
+		model.setTargetProperties(Map.of("dataModels", Map.of("test-operation", opMap)));
+		model.setTargetInputDataModelId("testXml");
+
+		final TranslationDiscoveryModel model2 = new TranslationDiscoveryModel(
+				"TestProvider|testService|1.0.0",
+				"TestProvider",
+				"testService",
+				"test-operation",
+				"TestConsumer",
+				"testJson",
+				null);
+		model2.setFromInterfaceTemplate("generic_mqtt");
+		model2.setToInterfaceTemplate("generic_http");
+		model2.setInterfaceTranslator("InterfaceTranslator");
+		model2.setInterfaceTranslatorPolicy("NONE");
+		model2.setInterfaceTranslatorProperties(Map.of("accessPort", 12345));
+		model2.setTargetPolicy("NONE");
+		model2.setTargetProperties(Map.of("dataModels", Map.of("test-operation", opMap)));
+		model2.setTargetInputDataModelId("testXml");
+		model2.setInputDataModelTranslator("DataModelTranslatorFactory");
+		model2.setInputDataModelTranslatorProperties(dmTranslatorFactoryIntf.properties());
+		model2.setInputDataModelTranslatorFactory(true);
+
+		final UUID bridgeId = UUID.fromString("9ef06aec-7865-48c0-b456-9f6faab47c22");
+		final TranslationDiscoveryResponseDTO expected = new TranslationDiscoveryResponseDTO(
+				bridgeId.toString(),
+				List.of(new TranslationBridgeCandidateDTO("TestProvider|testService|1.0.0", "generic_http")));
+
+		when(dataModelIdentifierNormalizer.normalize("testXml")).thenReturn("testXml");
+		doNothing().when(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+		when(csDriver.collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates)).thenReturn(List.of(interfaceTranslator));
+		when(csDriver.generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator))).thenReturn(Map.of());
+		when(itDriver.filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates)).thenReturn(candidates);
+		when(interfaceTranslatorMatchmaker.doMatchmaking(List.of(interfaceTranslator), Map.of())).thenReturn(interfaceTranslator);
+		when(csDriver.collectDataModelTranslatorCandidates(List.of(model))).thenReturn(List.of());
+		when(csDriver.collectDataModelTranslatorFactoryCandidates()).thenReturn(List.of(dataModelTranslatorFactory));
+		when(dmfDriver.isFactorySupportsTranslation("DataModelTranslatorFactory", dmTranslatorFactoryIntf.properties(), "testJson", "testXml")).thenReturn(true);
+
+		try (MockedStatic<UUID> mockedUUID = Mockito.mockStatic(UUID.class)) {
+			mockedUUID.when(() -> UUID.randomUUID()).thenReturn(bridgeId);
+			when(dbService.storeBridgeDiscoveries(bridgeId, "TestCreator", List.of(model2))).thenReturn(null);
+			when(converter.convertDiscoveryModels(bridgeId, List.of(model2))).thenReturn(expected);
+
+			final TranslationDiscoveryResponseDTO result = engine.doDiscovery(dto, flags, "origin");
+
+			assertNotNull(result);
+			assertEquals(expected, result);
+
+			verify(csDriver, never()).isBlacklisted("TestConsumer");
+			verify(csDriver, never()).filterOutBlacklistedSystems(List.of("TestProvider"));
+			verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("TestProvider"), "TestConsumer", "testService", "test-operation");
+			verify(dataModelIdentifierNormalizer).normalize("testXml");
+			verify(dataModelIdentifierValidator).validateDataModelIdentifier("testXml");
+			verify(csDriver).collectInterfaceTranslatorCandidates(List.of("generic_mqtt"), candidates);
+			verify(csDriver, never()).filterOutBlacklistedSystems(List.of("InterfaceTranslator"));
+			verify(csDriver, never()).filterOutProvidersBecauseOfUnauthorization(List.of("InterfaceTranslator"), "TranslationManager", "interfaceBridgeManagement", null);
+			verify(csDriver).generateTokenForManagerToInterfaceBridgeManagementService(List.of(interfaceTranslator));
+			verify(itDriver).filterOutNotAppropriateTargetsForInterfaceTranslator(interfaceTranslator, null, "test-operation", candidates);
+			verify(interfaceTranslatorMatchmaker).doMatchmaking(List.of(interfaceTranslator), Map.of());
+			verify(csDriver).collectDataModelTranslatorCandidates(List.of(model2));
+			verify(csDriver).collectDataModelTranslatorFactoryCandidates();
+			verify(dmfDriver).isFactorySupportsTranslation("DataModelTranslatorFactory", dmTranslatorFactoryIntf.properties(), "testJson", "testXml");
 			mockedUUID.verify(() -> UUID.randomUUID());
 			verify(dbService).storeBridgeDiscoveries(bridgeId, "TestCreator", List.of(model2));
 			verify(converter).convertDiscoveryModels(bridgeId, List.of(model2));
