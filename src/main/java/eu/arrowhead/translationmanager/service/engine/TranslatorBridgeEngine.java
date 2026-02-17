@@ -17,6 +17,7 @@
 package eu.arrowhead.translationmanager.service.engine;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,7 +119,7 @@ public class TranslatorBridgeEngine {
 		if (discoveryFlags.getOrDefault(TranslationDiscoveryFlag.CONSUMER_BLACKLIST_CHECK, false)
 				&& csDriver.isBlacklisted(dto.consumer())) {
 			// consumer is on the blacklist
-			throw new ForbiddenException(dto.consumer() + " system is blacklisted");
+			throw new ForbiddenException(dto.consumer() + " system is blacklisted", origin);
 		}
 
 		try {
@@ -137,7 +138,7 @@ public class TranslatorBridgeEngine {
 			// create tokens (if necessary) for using interface translator's translationBridgeManagement service
 			final Map<String, String> tokens = csDriver.generateTokenForManagerToInterfaceBridgeManagementService(appropriateInterfaceTranslatorCandidates);
 
-			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains a interface translator and a list of target interfaces that have
+			// create a structure that maps targets (their instanceId) to a list a pairs where each pair contains an interface translator and a list of target interfaces that have
 			// every information to make possible to communicate with the target by the interface translator
 			final Map<String, List<Pair<ServiceInstanceResponseDTO, List<String>>>> candidatesWithAppropriateInterfaceTranslators = calculateInterfaceTranslatorMap(
 					appropriateInterfaceTranslatorCandidates,
@@ -187,15 +188,15 @@ public class TranslatorBridgeEngine {
 	}
 
 	//-------------------------------------------------------------------------------------------------
-	public TranslationNegotiationResponseDTO doNegotiation(final UUID bridgeId, final String normalizedTargetInstanceId, final String origin) {
+	public TranslationNegotiationResponseDTO doNegotiation(final UUID bridgeId, final String targetInstanceId, final String origin) {
 		logger.debug("doNegotiation started...");
 		Assert.notNull(bridgeId, "bridgeId is null");
-		Assert.isTrue(!Utilities.isEmpty(normalizedTargetInstanceId), "normalizedTargetInstanceId is empty");
+		Assert.isTrue(!Utilities.isEmpty(targetInstanceId), "targetInstanceId is empty");
 		Assert.isTrue(!Utilities.isEmpty(origin), "origin is empty");
 
 		boolean storeException = false;
 		try {
-			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(bridgeId, normalizedTargetInstanceId);
+			final Pair<TranslationDiscoveryModel, BridgeDetails> bridgePair = dbService.selectBridgeFromDiscoveries(bridgeId, targetInstanceId);
 			storeException = true;
 			final TranslationDiscoveryModel model = bridgePair.getFirst();
 			final BridgeDetails detailsRecord = bridgePair.getSecond();
@@ -253,8 +254,6 @@ public class TranslatorBridgeEngine {
 				if (!TranslationManagerConstants.POLICY_TRANSLATION_BRIDGE_TOKEN_AUTH
 						.equals(bridgeResult.getFirst().get().policy().trim().toUpperCase())) {
 					// policy is not match with the expected
-
-					dbService.storeBridgeProblem(bridgeId, "Invalid policy from interface provider: " + bridgeResult.getFirst().get().policy());
 					itDriver.abortBridge(bridgeId, model.getInterfaceTranslatorProperties(), model.getInterfaceTranslatorToken());
 
 					throw new ExternalServerError("Interface provider returns with invalid data", origin);
@@ -283,9 +282,8 @@ public class TranslatorBridgeEngine {
 
 			throw new InvalidParameterException(ex.getMessage(), origin);
 		} catch (final ExternalServerError ex) {
-			if (storeException) {
-				dbService.storeBridgeProblem(bridgeId, ex.getMessage());
-			}
+			// only thrown after storeException is set to true
+			dbService.storeBridgeProblem(bridgeId, ex.getMessage());
 
 			throw new ExternalServerError(ex.getMessage(), origin);
 		} catch (final Exception ex) {
@@ -489,7 +487,7 @@ public class TranslatorBridgeEngine {
 					intf.protocol(),
 					intf.policy(),
 					normalizedProps);
-		} catch (final InvalidParameterException ex) {
+		} catch (final InvalidParameterException __) {
 			logger.debug("Invalid data model indentifier in one of the candidates");
 			return null;
 		}
@@ -649,7 +647,7 @@ public class TranslatorBridgeEngine {
 				if (dto.inputDataModelId() != null) {
 					final String targetInputDataModelId = getTargetDataModelId(toInterfaceProperties, dto.operation(), true);
 					if (targetInputDataModelId == null) {
-						// something is not OK in the target's data model specification
+						// something is not OK in the target's data model specification (should not happen, already checked in a previous method)
 						throw new InvalidParameterException("Input data model identifier is not found in target " + c.instanceId() + " and interface " + model.getToInterfaceTemplate());
 					}
 					model.setTargetInputDataModelId(targetInputDataModelId);
@@ -658,7 +656,7 @@ public class TranslatorBridgeEngine {
 				if (dto.outputDataModelId() != null) {
 					final String targetOutputDataModelId = getTargetDataModelId(toInterfaceProperties, dto.operation(), false);
 					if (targetOutputDataModelId == null) {
-						// something is not OK in the target's data model specification
+						// something is not OK in the target's data model specification (should not happen, already checked in a previous method)
 						throw new InvalidParameterException("Output data model identifier is not found in target " + c.instanceId() + " and interface " + model.getToInterfaceTemplate());
 					}
 					model.setTargetOutputDataModelId(targetOutputDataModelId);
@@ -852,22 +850,24 @@ public class TranslatorBridgeEngine {
 			return null;
 		}
 
-		// authorization check that the interface translator have access to data model translators' service
-		final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
-				relatedTranslators.stream().map(c -> c.provider().name()).toList(),
-				model.getInterfaceTranslator(),
-				Constants.SERVICE_DEF_DATA_MODEL_TRANSLATION,
-				null);
+		if (authorizationCheck) {
+			// authorization check that the interface translator have access to data model translators' service
+			final List<String> allowedTranslators = csDriver.filterOutProvidersBecauseOfUnauthorization(
+					relatedTranslators.stream().map(c -> c.provider().name()).toList(),
+					model.getInterfaceTranslator(),
+					Constants.SERVICE_DEF_DATA_MODEL_TRANSLATION,
+					null);
 
-		if (allowedTranslators.isEmpty()) {
-			logger.warn("Check the data model translators in the local cloud, because some of them are not accessible by the interface translator {}", model.getInterfaceTranslator());
-			return null;
+			if (allowedTranslators.isEmpty()) {
+				logger.warn("Check the data model translators in the local cloud, because some of them are not accessible by the interface translator {}", model.getInterfaceTranslator());
+				return null;
+			}
+
+			relatedTranslators = relatedTranslators
+					.stream()
+					.filter(c -> allowedTranslators.contains(c.provider().name()))
+					.toList();
 		}
-
-		relatedTranslators = relatedTranslators
-				.stream()
-				.filter(c -> allowedTranslators.contains(c.provider().name()))
-				.toList();
 
 		return dataModelTranslatorMatchmaker.doMatchmaking(relatedTranslators, Map.of());
 	}
@@ -876,7 +876,27 @@ public class TranslatorBridgeEngine {
 	private ServiceInstanceResponseDTO selectDataModelTranslatorFactoryIfPossible(final String from, final String to) {
 		logger.debug("selectDataModelTranslatorFactoryIfPossible started...");
 
-		// TODO: implement data model translator factories-related business logic here
+		final List<ServiceInstanceResponseDTO> dmtfCandidates = csDriver.collectDataModelTranslatorFactoryCandidates();
+		if (Utilities.isEmpty(dmtfCandidates)) {
+			// no available factories
+
+			return null;
+		}
+
+		// shuffle to give every factory instance an "equal" chance
+		Collections.shuffle(dmtfCandidates);
+
+		for (final ServiceInstanceResponseDTO factory : dmtfCandidates) {
+			final boolean supported = dmfDriver.isFactorySupportsTranslation(
+					factory.provider().name(),
+					factory.interfaces().get(0).properties(),
+					from,
+					to);
+
+			if (supported) {
+				return factory;
+			}
+		}
 
 		return null;
 	}
@@ -897,6 +917,7 @@ public class TranslatorBridgeEngine {
 		Map<String, Object> inputDataModelTranslatorSettings = null;
 		if (model.isInputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
+					model.getInputDataModelTranslator(),
 					model.getInputDataModelTranslatorProperties(),
 					model.getInputDataModelIdRequirement(),
 					model.getTargetInputDataModelId());
@@ -930,6 +951,7 @@ public class TranslatorBridgeEngine {
 		Map<String, Object> outputDataModelTranslatorSettings = null;
 		if (model.isOutputDataModelTranslatorFactory()) { // asking the factory to initialize a data model translator
 			final TranslationDataModelTranslatorInitializationResponseDTO initResponse = dmfDriver.initializeDataModelTranslator(
+					model.getOutputDataModelTranslator(),
 					model.getOutputDataModelTranslatorProperties(),
 					model.getTargetOutputDataModelId(),
 					model.getOutputDataModelIdRequirement());
@@ -944,7 +966,7 @@ public class TranslatorBridgeEngine {
 					initResponse.interfaceProperties(),
 					null))); // settings should be handled by the factory
 		} else {
-			outputDataModelTranslatorSettings = getCustomConfiguration(model.getInputDataModelTranslator());
+			outputDataModelTranslatorSettings = getCustomConfiguration(model.getOutputDataModelTranslator());
 			detailsRecord.setResultDmTranslatorData(Utilities.toJson(new TranslationDataModelTranslationDataDescriptorDTO(
 					model.getTargetOutputDataModelId(),
 					model.getOutputDataModelIdRequirement(),

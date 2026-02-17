@@ -108,7 +108,7 @@ public class TranslationReportValidation {
 		}
 
 		if (!Utilities.isUUID(dto.bridgeId().trim())) {
-			throw new InvalidParameterException("Bridge identifier is invalid", origin);
+			throw new InvalidParameterException("Bridge identifier is invalid: " + dto.bridgeId(), origin);
 		}
 
 		if (Utilities.isEmpty(dto.timestamp())) {
@@ -116,9 +116,9 @@ public class TranslationReportValidation {
 		}
 
 		try {
-			Utilities.parseUTCStringToZonedDateTime(dto.timestamp());
-		} catch (final DateTimeParseException ex) {
-			throw new InvalidParameterException("Timestamp is invalid", origin);
+			Utilities.parseUTCStringToZonedDateTime(dto.timestamp().trim());
+		} catch (final DateTimeParseException __) {
+			throw new InvalidParameterException("Timestamp is invalid: " + dto.timestamp(), origin);
 		}
 
 		if (Utilities.isEmpty(dto.state())) {
@@ -135,8 +135,10 @@ public class TranslationReportValidation {
 
 	//-------------------------------------------------------------------------------------------------
 	private NormalizedTranslationReportRequestDTO normalizeReport(final String requester, final TranslationReportRequestDTO dto) {
+		logger.debug("normalizeReport started...");
+
 		final ZonedDateTime now = Utilities.utcNow();
-		ZonedDateTime timestamp = Utilities.parseUTCStringToZonedDateTime(dto.timestamp());
+		ZonedDateTime timestamp = Utilities.parseUTCStringToZonedDateTime(dto.timestamp().trim());
 		if (timestamp.isAfter(now)) {
 			// maybe clocks out of sync, so we use 'now' as timestamp
 			timestamp = now;

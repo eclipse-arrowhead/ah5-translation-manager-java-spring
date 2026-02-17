@@ -106,6 +106,11 @@ public class CoreSystemsDriver {
 				.filter(sysName -> !sysInfo.getBlacklistCheckExcludeList().contains(sysName))
 				.toList();
 
+		if (candidates.isEmpty()) {
+			// no need to check the blacklist
+			return systemNames;
+		}
+
 		try {
 			boolean hasMorePage = false;
 			int pageNumber = 0;
@@ -151,6 +156,7 @@ public class CoreSystemsDriver {
 			throw ex;
 		} catch (final ArrowheadException ex) {
 			logger.error("Blacklist server is not available during the translation bridge process");
+			logger.debug(ex);
 			if (sysInfo.isBlacklistForced()) {
 				logger.error("All the systems have been filtered out, because blacklist is forced");
 				return List.of();
@@ -278,6 +284,21 @@ public class CoreSystemsDriver {
 		Assert.isTrue(!Utilities.containsNull(models), "models list contains null element");
 
 		final ServiceInstanceLookupRequestDTO payload = calculateDataModelTranslatorLookupPayload(models);
+		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
+				Constants.SERVICE_DEF_SERVICE_DISCOVERY,
+				Constants.SERVICE_OP_LOOKUP,
+				Constants.SYS_NAME_SERVICE_REGISTRY,
+				ServiceInstanceListResponseDTO.class,
+				payload);
+
+		return response.entries();
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	public List<ServiceInstanceResponseDTO> collectDataModelTranslatorFactoryCandidates() {
+		logger.debug("collectDataModelTranslatorFactoryCandidates started...");
+
+		final ServiceInstanceLookupRequestDTO payload = calculateDataModelTranslatorFactoryLookupPayload();
 		final ServiceInstanceListResponseDTO response = ahHttpService.consumeService(
 				Constants.SERVICE_DEF_SERVICE_DISCOVERY,
 				Constants.SERVICE_OP_LOOKUP,
@@ -458,5 +479,27 @@ public class CoreSystemsDriver {
 		});
 
 		return new ArrayList<>(resultSet);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	private ServiceInstanceLookupRequestDTO calculateDataModelTranslatorFactoryLookupPayload() {
+		logger.debug("calculateDataModelTranslatorFactoryLookupPayload started...");
+
+		final String templateName = sysInfo.isSslEnabled() ? Constants.GENERIC_HTTPS_INTERFACE_TEMPLATE_NAME : Constants.GENERIC_HTTP_INTERFACE_TEMPLATE_NAME;
+		final List<String> policies = AuthenticationPolicy.CERTIFICATE == sysInfo.getAuthenticationPolicy()
+				? List.of(ServiceInterfacePolicy.CERT_AUTH.name(), ServiceInterfacePolicy.NONE.name())
+				: List.of(ServiceInterfacePolicy.NONE.name());
+
+		ServiceInstanceLookupRequestDTO.Builder builder = new ServiceInstanceLookupRequestDTO.Builder()
+				.serviceDefinitionName(Constants.SERVICE_DEF_DATA_MODEL_TRANSLATOR_FACTORY_CONTROL)
+				.interfaceTemplateName(templateName)
+				.policies(policies);
+
+		if (translatorServiceMinAvailability > 0) {
+			final ZonedDateTime alivesAt = Utilities.utcNow().plusMinutes(translatorServiceMinAvailability);
+			builder = builder.alivesAt(Utilities.convertZonedDateTimeToUTCString(alivesAt));
+		}
+
+		return builder.build();
 	}
 }

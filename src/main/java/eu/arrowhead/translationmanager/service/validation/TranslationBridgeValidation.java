@@ -152,7 +152,7 @@ public class TranslationBridgeValidation {
 		try {
 			return UUID.fromString(bridgeId.trim());
 		} catch (final IllegalArgumentException __) {
-			throw new InvalidParameterException("Bridge identifier is invalid", origin);
+			throw new InvalidParameterException("Bridge identifier is invalid: " + bridgeId, origin);
 		}
 	}
 

@@ -289,7 +289,7 @@ public class TranslationBridgeMgmtValidation {
 
 	//-------------------------------------------------------------------------------------------------
 	private void validateServiceInstanceInterface(final ServiceInstanceInterfaceResponseDTO intf, final String origin) {
-		logger.debug("validateCandidate started...");
+		logger.debug("validateServiceInstanceInterface started...");
 
 		if (Utilities.isEmpty(intf.templateName())) {
 			throw new InvalidParameterException("Template name is missing", origin);
