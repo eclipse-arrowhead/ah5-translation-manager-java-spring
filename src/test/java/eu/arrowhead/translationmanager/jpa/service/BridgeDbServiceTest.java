@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +35,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.util.Pair;
 
 import eu.arrowhead.common.Constants;
@@ -58,6 +63,7 @@ import eu.arrowhead.translationmanager.jpa.repository.BridgeDetailsRepository;
 import eu.arrowhead.translationmanager.jpa.repository.BridgeDiscoveryRepository;
 import eu.arrowhead.translationmanager.jpa.repository.BridgeHeaderRepository;
 import eu.arrowhead.translationmanager.jpa.service.BridgeDbService.AbortResult;
+import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationQueryRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.NormalizedTranslationReportRequestDTO;
 import eu.arrowhead.translationmanager.service.dto.TranslationDiscoveryModel;
 
@@ -960,5 +966,464 @@ public class BridgeDbServiceTest {
 		assertEquals(TranslationBridgeStatus.CLOSED, result.fromStatus());
 
 		verify(headerRepository).findByUuid(bridgeId);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testAbortBridgeNoDetails() {
+		final String bridgeId = "42ab0775-26cc-49aa-87a4-2313f9d9975b";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		header.setId(1L);
+		header.setStatus(TranslationBridgeStatus.INITIALIZED);
+
+		when(headerRepository.findByUuid(bridgeId)).thenReturn(Optional.of(header));
+		doNothing().when(discoveryRepository).deleteByHeader(header);
+		when(headerRepository.saveAndFlush(header)).thenReturn(header);
+		when(detailsRepository.findByHeader(header)).thenReturn(Optional.empty());
+
+		final AbortResult result = dbService.abortBridge(uuid, null);
+
+		assertNotNull(result);
+		assertTrue(result.abortHappened());
+		assertNull(result.detailsRecord());
+		assertEquals(TranslationBridgeStatus.INITIALIZED, result.fromStatus());
+		assertEquals(TranslationBridgeStatus.ABORTED, header.getStatus());
+
+		verify(headerRepository).findByUuid(bridgeId);
+		verify(discoveryRepository).deleteByHeader(header);
+		verify(headerRepository).saveAndFlush(header);
+		verify(detailsRepository).findByHeader(header);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testAbortBridgeWithDetails() {
+		final String bridgeId = "42ab0775-26cc-49aa-87a4-2313f9d9975b";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		header.setId(1L);
+		header.setStatus(TranslationBridgeStatus.INITIALIZED);
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+
+		when(headerRepository.findByUuid(bridgeId)).thenReturn(Optional.of(header));
+		doNothing().when(discoveryRepository).deleteByHeader(header);
+		when(headerRepository.saveAndFlush(header)).thenReturn(header);
+		when(detailsRepository.findByHeader(header)).thenReturn(Optional.of(details));
+
+		final AbortResult result = dbService.abortBridge(uuid, null);
+
+		assertNotNull(result);
+		assertTrue(result.abortHappened());
+		assertEquals(details, result.detailsRecord());
+		assertEquals(TranslationBridgeStatus.INITIALIZED, result.fromStatus());
+		assertEquals(TranslationBridgeStatus.ABORTED, header.getStatus());
+
+		verify(headerRepository).findByUuid(bridgeId);
+		verify(discoveryRepository).deleteByHeader(header);
+		verify(headerRepository).saveAndFlush(header);
+		verify(detailsRepository).findByHeader(header);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testGetBridgeDetailsPageInputNull() {
+		final Throwable ex = assertThrows(
+				IllegalArgumentException.class,
+				() -> dbService.getBridgeDetailsPage(null));
+
+		assertEquals("dto is missing", ex.getMessage());
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageDbException() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		when(detailsRepository.findAll(pageRequest)).thenThrow(RuntimeException.class);
+
+		final Throwable ex = assertThrows(
+				InternalServerError.class,
+				() -> dbService.getBridgeDetailsPage(dto));
+
+		assertEquals("Database operation error", ex.getMessage());
+
+		verify(detailsRepository).findAll(pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageNoFilters() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeDetails details = new BridgeDetails();
+		details.setId(1L);
+
+		when(detailsRepository.findAll(pageRequest)).thenReturn(new PageImpl<>(List.of(details)));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertEquals(1, result.getTotalElements());
+		assertEquals(details, result.getContent().get(0));
+
+		verify(detailsRepository).findAll(pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters1() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				List.of(uuid),
+				null,
+				null,
+				List.of("OtherConsumer"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+
+		when(detailsRepository.findByHeader_UuidIn(List.of(bridgeId))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByHeader_UuidIn(List.of(bridgeId));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters2() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				List.of(uuid),
+				null,
+				null,
+				List.of("TestConsumer"),
+				List.of("OtherProvider"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+
+		when(detailsRepository.findByHeader_UuidIn(List.of(bridgeId))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByHeader_UuidIn(List.of(bridgeId));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters3() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				List.of(uuid),
+				null,
+				null,
+				null,
+				List.of("TestProvider"),
+				List.of("otherService"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+		details.setServiceDefinition("testService");
+
+		when(detailsRepository.findByHeader_UuidIn(List.of(bridgeId))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByHeader_UuidIn(List.of(bridgeId));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters4() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				null,
+				null,
+				List.of("TestConsumer"),
+				null,
+				List.of("testService"),
+				List.of("OtherInterfaceTranslator"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+		details.setServiceDefinition("testService");
+		details.setInterfaceTranslator("InterfaceTranslator");
+
+		when(detailsRepository.findByConsumerIn(List.of("TestConsumer"))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByConsumerIn(List.of("TestConsumer"));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters5() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				null,
+				List.of(TranslationBridgeStatus.INITIALIZED),
+				null,
+				List.of("TestProvider"),
+				null,
+				List.of("InterfaceTranslator"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		header.setStatus(TranslationBridgeStatus.USED);
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+		details.setServiceDefinition("testService");
+		details.setInterfaceTranslator("InterfaceTranslator");
+
+		when(detailsRepository.findByProviderIn(List.of("TestProvider"))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByProviderIn(List.of("TestProvider"));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters6() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				List.of("Other"),
+				List.of(TranslationBridgeStatus.USED),
+				null,
+				null,
+				List.of("testService"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		header.setStatus(TranslationBridgeStatus.USED);
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+		details.setServiceDefinition("testService");
+		details.setInterfaceTranslator("InterfaceTranslator");
+
+		when(detailsRepository.findByServiceDefinitionIn(List.of("testService"))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByServiceDefinitionIn(List.of("testService"));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testGetBridgeDetailsPageWithFilters7() {
+		final PageRequest pageRequest = PageRequest.of(0, 10);
+		final String bridgeId = "82b6d4db-71e4-4db0-a546-8d3250525570";
+		final UUID uuid = UUID.fromString(bridgeId);
+		final NormalizedTranslationQueryRequestDTO dto = new NormalizedTranslationQueryRequestDTO(
+				pageRequest,
+				null,
+				List.of("Creator"),
+				null,
+				null,
+				null,
+				null,
+				List.of("InterfaceTranslator"),
+				List.of("OtherDataModelTranslator"),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+
+		final BridgeHeader header = new BridgeHeader(uuid, "Creator");
+		header.setStatus(TranslationBridgeStatus.USED);
+		final BridgeDetails details = new BridgeDetails();
+		details.setHeader(header);
+		details.setId(1L);
+		details.setConsumer("TestConsumer");
+		details.setProvider("TestProvider");
+		details.setServiceDefinition("testService");
+		details.setInterfaceTranslator("InterfaceTranslator");
+		details.setInputDmTranslator("InputDMTranslator");
+		details.setResultDmTranslator("ResultDMTranslator");
+
+		when(detailsRepository.findByInterfaceTranslatorIn(List.of("InterfaceTranslator"))).thenReturn(List.of(details));
+		when(detailsRepository.findAllByIdIn(Set.of(), pageRequest)).thenReturn(new PageImpl<>(List.of()));
+
+		final Page<BridgeDetails> result = dbService.getBridgeDetailsPage(dto);
+
+		assertNotNull(result);
+		assertTrue(result.isEmpty());
+
+		verify(detailsRepository, never()).findAll(pageRequest);
+		verify(detailsRepository).findByInterfaceTranslatorIn(List.of("InterfaceTranslator"));
+		verify(detailsRepository).findAllByIdIn(Set.of(), pageRequest);
 	}
 }
