@@ -1048,4 +1048,101 @@ public class CoreSystemsDriverTest {
 
 		assertEquals("system name is missing", ex.getMessage());
 	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Test
+	public void testCollectDataModelTranslatorFactoryCandidatesOk1() {
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("dataModelTranslatorFactoryControl"),
+				null,
+				null,
+				null,
+				null,
+				List.of("generic_http"),
+				null,
+				List.of("NONE"));
+
+		final ServiceInstanceResponseDTO resultElement = new ServiceInstanceResponseDTO("dataManagerTranslatorFactoryInstance", null, null, null, null, null, null, null, null);
+		final ServiceInstanceListResponseDTO result = new ServiceInstanceListResponseDTO(List.of(resultElement), 1);
+
+		when(sysInfo.isSslEnabled()).thenReturn(false);
+		when(sysInfo.getAuthenticationPolicy()).thenReturn(AuthenticationPolicy.DECLARED);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(result);
+
+		final List<ServiceInstanceResponseDTO> response = driver.collectDataModelTranslatorFactoryCandidates();
+
+		assertNotNull(response);
+		assertEquals(1, response.size());
+		assertEquals("dataManagerTranslatorFactoryInstance", response.get(0).instanceId());
+
+		verify(sysInfo).isSslEnabled();
+		verify(sysInfo).getAuthenticationPolicy();
+		verify(ahHttpService).consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@SuppressWarnings("checkstyle:MagicNumber")
+	@Test
+	public void testCollectDataModelTranslatorFactoryCandidatesOk2() {
+		final ServiceInstanceLookupRequestDTO payload = new ServiceInstanceLookupRequestDTO(
+				null,
+				null,
+				List.of("dataModelTranslatorFactoryControl"),
+				null,
+				"2026-2-12T10:05:00Z",
+				null,
+				null,
+				List.of("generic_https"),
+				null,
+				List.of("CERT_AUTH", "NONE"));
+
+		final ServiceInstanceResponseDTO resultElement = new ServiceInstanceResponseDTO("dataManagerTranslatorFactoryInstance", null, null, null, null, null, null, null, null);
+		final ServiceInstanceListResponseDTO result = new ServiceInstanceListResponseDTO(List.of(resultElement), 1);
+
+		when(sysInfo.isSslEnabled()).thenReturn(true);
+		when(sysInfo.getAuthenticationPolicy()).thenReturn(AuthenticationPolicy.CERTIFICATE);
+		when(ahHttpService.consumeService(
+				"serviceDiscovery",
+				"lookup",
+				"ServiceRegistry",
+				ServiceInstanceListResponseDTO.class,
+				payload)).thenReturn(result);
+
+		ReflectionTestUtils.setField(driver, "translatorServiceMinAvailability", 5);
+
+		try (MockedStatic<Utilities> staticMock = Mockito.mockStatic(Utilities.class)) {
+			final ZonedDateTime time = ZonedDateTime.of(2026, 2, 12, 10, 0, 0, 0, ZoneId.of(Constants.UTC));
+			staticMock.when(() -> Utilities.utcNow()).thenReturn(time);
+			staticMock.when(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class))).thenReturn("2026-2-12T10:05:00Z");
+
+			final List<ServiceInstanceResponseDTO> response = driver.collectDataModelTranslatorFactoryCandidates();
+
+			assertNotNull(response);
+			assertEquals(1, response.size());
+			assertEquals("dataManagerTranslatorFactoryInstance", response.get(0).instanceId());
+
+			verify(sysInfo).isSslEnabled();
+			verify(sysInfo).getAuthenticationPolicy();
+			staticMock.verify(() -> Utilities.utcNow());
+			staticMock.verify(() -> Utilities.convertZonedDateTimeToUTCString(any(ZonedDateTime.class)));
+			verify(ahHttpService).consumeService(
+					"serviceDiscovery",
+					"lookup",
+					"ServiceRegistry",
+					ServiceInstanceListResponseDTO.class,
+					payload);
+		}
+	}
 }

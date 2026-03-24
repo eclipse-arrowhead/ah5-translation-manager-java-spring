@@ -272,7 +272,7 @@ public class BridgeDbService {
 	@Transactional(rollbackFor = ArrowheadException.class)
 	public void storeBridgeProblem(final UUID bridgeId, final String errorMessage) {
 		logger.debug("storeBridgeProblem started...");
-		Assert.notNull(bridgeId, "bridgeId is missing");
+		Assert.notNull(bridgeId, "bridgeId is null");
 		Assert.isTrue(!Utilities.isEmpty(errorMessage), "errorMessage is missing");
 
 		try {
@@ -300,7 +300,7 @@ public class BridgeDbService {
 	@Transactional(rollbackFor = ArrowheadException.class)
 	public AbortResult abortBridge(final UUID bridgeId, final String createdByRequirement) {
 		logger.debug("abortBridge started...");
-		Assert.notNull(bridgeId, "bridgeId is missing");
+		Assert.notNull(bridgeId, "bridgeId is null");
 
 		try {
 			final Optional<BridgeHeader> headerOpt = headerRepository.findByUuid(bridgeId.toString());
