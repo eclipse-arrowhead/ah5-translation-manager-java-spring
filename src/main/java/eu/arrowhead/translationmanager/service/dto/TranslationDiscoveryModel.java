@@ -17,6 +17,7 @@
 package eu.arrowhead.translationmanager.service.dto;
 
 import java.util.Map;
+import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -312,5 +313,76 @@ public class TranslationDiscoveryModel {
 	//-------------------------------------------------------------------------------------------------
 	public void setInterfaceTranslatorToken(final String interfaceTranslatorToken) {
 		this.interfaceTranslatorToken = interfaceTranslatorToken;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Override
+	public int hashCode() {
+		return Objects.hash(
+				consumer,
+				fromInterfaceTemplate,
+				inputDataModelIdRequirement,
+				inputDataModelTranslator,
+				inputDataModelTranslatorFactory,
+				inputDataModelTranslatorProperties,
+				interfaceTranslator,
+				interfaceTranslatorPolicy,
+				interfaceTranslatorProperties,
+				interfaceTranslatorToken,
+				operation,
+				outputDataModelIdRequirement,
+				outputDataModelTranslator,
+				outputDataModelTranslatorFactory,
+				outputDataModelTranslatorProperties,
+				provider,
+				serviceDefinition,
+				targetInputDataModelId,
+				targetInstanceId,
+				targetOutputDataModelId,
+				targetPolicy,
+				targetProperties,
+				toInterfaceTemplate);
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	@Override
+	public boolean equals(final Object obj) {
+		if (this == obj) {
+			return true;
+		}
+
+		if (obj == null) {
+			return false;
+		}
+
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+
+		final TranslationDiscoveryModel other = (TranslationDiscoveryModel) obj;
+
+		return Objects.equals(consumer, other.consumer)
+				&& Objects.equals(fromInterfaceTemplate, other.fromInterfaceTemplate)
+				&& Objects.equals(inputDataModelIdRequirement, other.inputDataModelIdRequirement)
+				&& Objects.equals(inputDataModelTranslator, other.inputDataModelTranslator)
+				&& inputDataModelTranslatorFactory == other.inputDataModelTranslatorFactory
+				&& Objects.equals(inputDataModelTranslatorProperties, other.inputDataModelTranslatorProperties)
+				&& Objects.equals(interfaceTranslator, other.interfaceTranslator)
+				&& Objects.equals(interfaceTranslatorPolicy, other.interfaceTranslatorPolicy)
+				&& Objects.equals(interfaceTranslatorProperties, other.interfaceTranslatorProperties)
+				&& Objects.equals(interfaceTranslatorToken, other.interfaceTranslatorToken)
+				&& Objects.equals(operation, other.operation)
+				&& Objects.equals(outputDataModelIdRequirement, other.outputDataModelIdRequirement)
+				&& Objects.equals(outputDataModelTranslator, other.outputDataModelTranslator)
+				&& outputDataModelTranslatorFactory == other.outputDataModelTranslatorFactory
+				&& Objects.equals(outputDataModelTranslatorProperties, other.outputDataModelTranslatorProperties)
+				&& Objects.equals(provider, other.provider)
+				&& Objects.equals(serviceDefinition, other.serviceDefinition)
+				&& Objects.equals(targetInputDataModelId, other.targetInputDataModelId)
+				&& Objects.equals(targetInstanceId, other.targetInstanceId)
+				&& Objects.equals(targetOutputDataModelId, other.targetOutputDataModelId)
+				&& Objects.equals(targetPolicy, other.targetPolicy)
+				&& Objects.equals(targetProperties, other.targetProperties)
+				&& Objects.equals(toInterfaceTemplate, other.toInterfaceTemplate);
 	}
 }
